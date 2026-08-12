@@ -2736,7 +2736,17 @@ function buildCaption() {
 //  ritmo, gancho e concisão. A IA traduz um no outro, sem inventar
 //  factos: recebe o texto real da página e só o pode reescrever.
 // ═══════════════════════════════════════════════════════════════
-const AI_ENDPOINT = '/api/ai';   // ver api/ai.js (Vercel Function)
+// ═══ CONFIGURAÇÃO DO ENDPOINT DE IA ═══
+// Em contexto web, o caminho relativo funciona (mesma origem que o backend,
+// quando publicado no mesmo domínio). Em contexto Capacitor NÃO existe essa
+// garantia — a app nativa corre de uma origem própria (ex.: capacitor://
+// localhost), por isso precisa de um URL absoluto explícito.
+const AI_API_BASE_URL_NATIVE = ''; // <-- PREENCHER antes de publicar iOS/Android, ex.: 'https://api.oteudominio.com/ai'
+const IS_NATIVE_PLATFORM = !!(window.Capacitor && window.Capacitor.isNativePlatform && window.Capacitor.isNativePlatform());
+const AI_ENDPOINT = IS_NATIVE_PLATFORM ? (AI_API_BASE_URL_NATIVE || '/api/ai') : '/api/ai';
+if (IS_NATIVE_PLATFORM && !AI_API_BASE_URL_NATIVE) {
+  console.warn('[My Studio] AI_API_BASE_URL_NATIVE não está configurado — a app nativa vai tentar um caminho relativo que não existe fora de um browser. Define-o em app/my-studio.html antes de publicar para iOS/Android.');
+}
 
 async function askAI(system, user, maxTokens) {
   const controller = new AbortController();

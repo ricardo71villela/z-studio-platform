@@ -1,0 +1,7 @@
+{
+  "name": "mystudio-ai-backend",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Backend de IA para o My Studio — ver README.md para instruções de deploy.",
+  "engines": { "node": ">=18" }
+}

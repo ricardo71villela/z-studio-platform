@@ -653,6 +653,19 @@ try {
   } catch (e) { assert('BLOCO 3t (CSP presente) não rebentou', false, e.message + ' | ' + e.stack); }
 
   try {
+    // ENDPOINT DE IA CONFIGURÁVEL — a app não deve assumir que "/api/ai" serve
+    // para tudo; em contexto nativo precisa de um URL absoluto configurável.
+    assert('IS_NATIVE_PLATFORM existe e é falso neste teste (Chromium comum, não Capacitor)', IS_NATIVE_PLATFORM === false);
+    assert('sem Capacitor, o endpoint usa o caminho relativo normal', AI_ENDPOINT === '/api/ai', AI_ENDPOINT);
+    assert('a constante de configuração nativa existe (mesmo que vazia por preencher)', typeof AI_API_BASE_URL_NATIVE === 'string');
+    // simula estar em contexto nativo, sem URL configurado — tem de cair para o relativo, não rebentar
+    window.Capacitor = { isNativePlatform: () => true };
+    const wouldBeNative = !!(window.Capacitor && window.Capacitor.isNativePlatform && window.Capacitor.isNativePlatform());
+    assert('deteção de plataforma nativa funciona quando window.Capacitor existe', wouldBeNative === true);
+    delete window.Capacitor;
+  } catch (e) { assert('BLOCO 3u (endpoint de IA configurável) não rebentou', false, e.message + ' | ' + e.stack); }
+
+  try {
     // limpar rascunho tem de repor tudo isto também — mas clearDraft() apaga
     // MESMO tudo (memória + IndexedDB), por isso este teste tem de restaurar
     // as fotos a seguir, para não afetar os testes de persistência mais à frente
