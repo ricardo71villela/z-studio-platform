@@ -646,6 +646,13 @@ try {
   } catch (e) { assert('BLOCO 3s (segurança — XSS em Brand Kit e produção em massa) não rebentou', false, e.message + ' | ' + e.stack); }
 
   try {
+    // HARDENING — CSP presente e a restringir o que deve
+    assert('CSP está presente no <head>', !!document.querySelector('meta[http-equiv="Content-Security-Policy"]'));
+    const csp = document.querySelector('meta[http-equiv="Content-Security-Policy"]').content;
+    assert('CSP restringe script-src a self + cdnjs', csp.includes('cdnjs.cloudflare.com') && csp.includes("default-src 'self'"));
+  } catch (e) { assert('BLOCO 3t (CSP presente) não rebentou', false, e.message + ' | ' + e.stack); }
+
+  try {
     // limpar rascunho tem de repor tudo isto também — mas clearDraft() apaga
     // MESMO tudo (memória + IndexedDB), por isso este teste tem de restaurar
     // as fotos a seguir, para não afetar os testes de persistência mais à frente
@@ -914,11 +921,16 @@ try {
 
   try {
     state._styleCustomized = true; // força um estado conhecido, para testar mesmo o reset (não o que sobrou de blocos anteriores)
+    let revokedCount = 0;
+    const originalRevoke = URL.revokeObjectURL;
+    URL.revokeObjectURL = function(u) { revokedCount++; return originalRevoke.call(URL, u); };
     const originalConfirm = window.confirm;
     window.confirm = () => true;
     clearDraft(); await sleep(250);
     window.confirm = originalConfirm;
+    URL.revokeObjectURL = originalRevoke;
     assert('limpar rascunho esvazia a memória', state.photos.length === 0);
+    assert('limpar rascunho liberta explicitamente os blob URLs das fotos (não só as larga)', revokedCount > 0, revokedCount);
     const photosAfter = await idbGet('photos').catch(() => null);
     assert('limpar rascunho esvazia o IndexedDB', !photosAfter || photosAfter.length === 0);
     assert('limpar rascunho destranca a paleta automática outra vez', state._styleCustomized === false);

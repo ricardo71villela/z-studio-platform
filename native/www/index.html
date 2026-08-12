@@ -4,6 +4,29 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
 <meta name="description" content="My Studio — cria posts, stories e carrosséis para redes sociais a partir das tuas fotos, com recorte inteligente, ficha de produto por categoria e legendas por IA em 6 idiomas.">
+<!--
+  CSP com uma limitação conhecida e documentada: 'unsafe-inline' em script-src
+  continua necessário porque a app usa ~95 atributos onclick/oninput/onchange
+  inline em vez de addEventListener. Eliminar isso é uma refatoração grande e
+  de risco elevado (toca quase todos os elementos interativos), fora do âmbito
+  desta fase de hardening — fica documentado como risco aceite, não escondido.
+  O que esta CSP já protege: origem dos scripts (só self + cdnjs, nada mais),
+  de onde vêm folhas de estilo/fontes, e que não se pode carregar a app dentro
+  de uma <iframe> de outro site (frame-ancestors).
+-->
+<meta http-equiv="Content-Security-Policy" content="
+  default-src 'self';
+  script-src 'self' https://cdnjs.cloudflare.com 'unsafe-inline';
+  style-src 'self' https://fonts.googleapis.com 'unsafe-inline';
+  font-src https://fonts.gstatic.com;
+  img-src 'self' data: blob:;
+  media-src blob:;
+  connect-src 'self';
+  frame-ancestors 'none';
+  base-uri 'self';
+  form-action 'self';
+">
+
 <!-- CSP de base — restringe scripts/conexões ao que a app realmente usa.
      Nota honesta: ainda precisa de 'unsafe-inline' para script-src/style-src
      porque toda a app vive num único ficheiro HTML com <script>/<style>
@@ -1690,6 +1713,9 @@ async function clearDraft() {
     idbDelete('photos').catch(() => {}),
     idbDelete('logo').catch(() => {})
   ]);
+  // liberta explicitamente os blob URLs das fotos antes de os largar — sem isto,
+  // o browser mantém os ficheiros na memória até a página recarregar
+  (state.photos || []).forEach(u => { try { URL.revokeObjectURL(u); } catch (e) {} });
   state.photos = []; state.carPhotos = []; state.photo = null; state.photoFiles = []; state.img = null;
   state.title = ''; state.price = ''; state.loc = ''; state.badge = '';
   state.spec = [ { label: '', value: '' }, { label: '', value: '' }, { label: '', value: '' }, { label: '', value: '' } ];
@@ -2713,15 +2739,25 @@ function buildCaption() {
 const AI_ENDPOINT = '/api/ai';   // ver api/ai.js (Vercel Function)
 
 async function askAI(system, user, maxTokens) {
-  const r = await fetch(AI_ENDPOINT, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ system, user, max_tokens: maxTokens || 1200 })
-  });
-  if (!r.ok) throw new Error('IA ' + r.status + ' — ' + (await r.text()).slice(0, 120));
-  const d = await r.json();
-  const txt = (d.content || []).map(c => c.text || '').join('').trim();
-  return txt.replace(/^```(?:json)?\s*|\s*```$/g, '').trim();
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), 25000); // 25s — evita a UI ficar pendurada para sempre
+  try {
+    const r = await fetch(AI_ENDPOINT, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ system, user, max_tokens: maxTokens || 1200 }),
+      signal: controller.signal
+    });
+    if (!r.ok) throw new Error('IA ' + r.status + ' — ' + (await r.text()).slice(0, 120));
+    const d = await r.json();
+    const txt = (d.content || []).map(c => c.text || '').join('').trim();
+    return txt.replace(/^```(?:json)?\s*|\s*```$/g, '').trim();
+  } catch (e) {
+    if (e.name === 'AbortError') throw new Error('IA demorou demasiado tempo a responder (mais de 25s) — tenta outra vez.');
+    throw e;
+  } finally {
+    clearTimeout(timeoutId);
+  }
 }
 
 // A voz da IA adapta-se à marca configurada em "Marca & Idiomas" — funciona
