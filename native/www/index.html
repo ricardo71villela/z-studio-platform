@@ -24,7 +24,10 @@
 :root {
   --gold: #B8935A; --gold-light: #D4AF7A; --gold-dark: #8B6B3A; --gold-rgb: 184,147,90;
   --black: #0A0A0A; --surface: #141310; --surface-2: #1C1A16;
-  --border: #2A2721; --text: #EDEAE2; --text2: #9E9C94; --text3: #6E6C64;
+  /* --border e --text3 foram propositadamente clareados para cumprir WCAG AA —
+     os valores antigos (#2A2721 e #6E6C64) ficavam abaixo do mínimo de contraste
+     em texto de apoio e em limites de campos, confirmado com feedback real de uso. */
+  --border: #6C6658; --text: #EDEAE2; --text2: #9E9C94; --text3: #8A8880;
 }
 * { margin:0; padding:0; box-sizing:border-box; }
 html { scrollbar-width: thin; scrollbar-color: var(--border) var(--black); }
@@ -60,6 +63,7 @@ select, input[type=text], input[type=number], textarea {
   transition:border-color .3s ease, box-shadow .3s ease;
 }
 select:focus, input:focus, textarea:focus { border-color:var(--gold); box-shadow:0 0 0 3px rgba(var(--gold-rgb),0.14); }
+input::placeholder, textarea::placeholder { color:var(--text3); opacity:1; }
 input[type=range] {
   -webkit-appearance:none; appearance:none; width:100%; height:3px; background:var(--border); border-radius:2px;
   outline:none; margin:9px 0 4px; cursor:pointer; transition:background-color .3s ease;
@@ -2307,8 +2311,11 @@ function applyCategoryPreset(cat) {
 
 
 // ═══ DESENHO ═══
+let _drawGeneration = 0;
 async function draw() {
+  const myGen = ++_drawGeneration;
   await document.fonts.ready;
+  if (myGen !== _drawGeneration) return; // um draw() mais recente já começou entretanto — este já não interessa
   const c = document.getElementById('preview');
   await renderTo(c);
 }
