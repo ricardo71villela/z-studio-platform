@@ -1726,8 +1726,18 @@ function parseEuroNumber(str) {
   if (!str) return NaN;
   let s = String(str).replace(/[^\d.,]/g, '');
   if (!s) return NaN;
-  if (s.includes(',')) s = s.replace(/\./g, '').replace(',', '.');
-  else s = s.replace(/\./g, '');
+  // PT/FR/ES/DE/IT usam vírgula como separador decimal e ponto (ou espaço,
+  // já removido acima) como separador de milhares. O inglês é o único dos
+  // 6 idiomas suportados que faz o oposto — sem isto, "16.50" em modo EN
+  // era lido como 1650 (confirmado como bug real na auditoria).
+  if (state.lang === 'en') {
+    s = s.replace(/,/g, ''); // vírgula = separador de milhares em EN — remove
+    // o ponto, se existir, já é o separador decimal correto — não mexer
+  } else if (s.includes(',')) {
+    s = s.replace(/\./g, '').replace(',', '.');
+  } else {
+    s = s.replace(/\./g, '');
+  }
   return parseFloat(s);
 }
 

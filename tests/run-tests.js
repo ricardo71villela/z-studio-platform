@@ -588,6 +588,26 @@ try {
   } catch (e) { assert('BLOCO 3q (ajuste manual de enquadramento) não rebentou', false, e.message + ' | ' + e.stack); }
 
   try {
+    // REGRESSÃO — parseEuroNumber() tem de respeitar o idioma ativo. Bug real
+    // confirmado numa auditoria: "16.50" em modo EN era lido como 1650 (100x
+    // errado), porque a função assumia sempre convenção PT/EU independentemente
+    // do idioma. Este teste existe especificamente para nunca mais voltar
+    // silenciosamente.
+    const langSnap = state.lang;
+    state.lang = 'en';
+    assert('EN: "16.50" lê-se como 16.5, não 1650 (bug real corrigido)', parseEuroNumber('16.50') === 16.5, parseEuroNumber('16.50'));
+    assert('EN: "1,234.50" lê-se como 1234.5 (vírgula = milhares em EN)', parseEuroNumber('1,234.50') === 1234.5, parseEuroNumber('1,234.50'));
+    state.lang = 'pt';
+    assert('PT: "16,50" continua a ler-se como 16.5', parseEuroNumber('16,50') === 16.5, parseEuroNumber('16,50'));
+    assert('PT: "295.000" continua a ler-se como 295000', parseEuroNumber('295.000') === 295000, parseEuroNumber('295.000'));
+    state.lang = 'fr';
+    assert('FR: "1 234,56" (espaço de milhares) lê-se como 1234.56', parseEuroNumber('1 234,56') === 1234.56, parseEuroNumber('1 234,56'));
+    state.lang = 'de';
+    assert('DE: "1.234,56" lê-se como 1234.56', parseEuroNumber('1.234,56') === 1234.56, parseEuroNumber('1.234,56'));
+    state.lang = langSnap;
+  } catch (e) { assert('BLOCO 3r (parseEuroNumber respeita o idioma — regressão)  não rebentou', false, e.message + ' | ' + e.stack); }
+
+  try {
     // limpar rascunho tem de repor tudo isto também — mas clearDraft() apaga
     // MESMO tudo (memória + IndexedDB), por isso este teste tem de restaurar
     // as fotos a seguir, para não afetar os testes de persistência mais à frente
