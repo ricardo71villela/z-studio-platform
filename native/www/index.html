@@ -4,6 +4,23 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
 <meta name="description" content="My Studio — cria posts, stories e carrosséis para redes sociais a partir das tuas fotos, com recorte inteligente, ficha de produto por categoria e legendas por IA em 6 idiomas.">
+<!-- CSP de base — restringe scripts/conexões ao que a app realmente usa.
+     Nota honesta: ainda precisa de 'unsafe-inline' para script-src/style-src
+     porque toda a app vive num único ficheiro HTML com <script>/<style>
+     inline — uma CSP mais estrita (nonces/hashes) exigiria mudar essa
+     arquitetura de ficheiro único, o que não fazia parte deste hardening. -->
+<meta http-equiv="Content-Security-Policy" content="
+  default-src 'self';
+  script-src 'self' 'unsafe-inline' https://cdnjs.cloudflare.com;
+  style-src 'self' 'unsafe-inline' https://fonts.googleapis.com;
+  font-src 'self' https://fonts.gstatic.com;
+  img-src 'self' data: blob:;
+  media-src 'self' blob:;
+  connect-src 'self';
+  frame-ancestors 'none';
+  base-uri 'self';
+  form-action 'self';
+">
 <title>My Studio — Conteúdo para Redes Sociais</title>
 <!-- PWA / iOS standalone -->
 <link rel="manifest" href="manifest.webmanifest">
@@ -657,7 +674,19 @@ async function refreshBrandKitSelect() {
   if (!sel) return;
   const kits = (await idbGet('kits').catch(() => null)) || {};
   const cur = sel.value;
-  sel.innerHTML = '<option value="">— nenhum —</option>' + Object.keys(kits).map(n => `<option value="${n}">${n}</option>`).join('');
+  // Usa APIs DOM seguras (createElement + textContent), não innerHTML —
+  // o nome do kit é texto escrito livremente pela pessoa (via prompt()) e
+  // nunca deve ser interpretado como HTML. Vulnerabilidade XSS real,
+  // confirmada e corrigida numa auditoria de segurança.
+  sel.innerHTML = '';
+  const noneOpt = document.createElement('option');
+  noneOpt.value = ''; noneOpt.textContent = '— nenhum —';
+  sel.appendChild(noneOpt);
+  Object.keys(kits).forEach(n => {
+    const opt = document.createElement('option');
+    opt.value = n; opt.textContent = n;
+    sel.appendChild(opt);
+  });
   if (kits[cur]) sel.value = cur;
 }
 async function saveBrandKit() {
@@ -1565,10 +1594,18 @@ function extractVideoFrame(file, atFraction) {
     video.onerror = () => { cleanup(); reject(new Error('vídeo inválido ou formato não suportado')); };
   });
 }
+// Limites de upload — sensatos, mas configuráveis num único sítio.
+// A app tem de falhar bem em dispositivos com pouca memória, não travar.
+const UPLOAD_LIMITS = { maxFileMB: 25, maxFilesPerBatch: 30, maxTotalPhotos: 60 };
 async function handleUploadFiles(fileList) {
   const all = [...fileList];
-  const imageFiles = all.filter(f => f.type.startsWith('image/'));
-  const videoFiles = all.filter(f => f.type.startsWith('video/'));
+  const oversized = all.filter(f => f.size > UPLOAD_LIMITS.maxFileMB * 1024 * 1024);
+  const withinSize = all.filter(f => f.size <= UPLOAD_LIMITS.maxFileMB * 1024 * 1024);
+  const batch = withinSize.slice(0, UPLOAD_LIMITS.maxFilesPerBatch);
+  if (oversized.length) toast(oversized.length + ' ficheiro(s) acima de ' + UPLOAD_LIMITS.maxFileMB + 'MB foram ignorados');
+  if (withinSize.length > UPLOAD_LIMITS.maxFilesPerBatch) toast('Só as primeiras ' + UPLOAD_LIMITS.maxFilesPerBatch + ' fotos deste carregamento foram usadas');
+  const imageFiles = batch.filter(f => f.type.startsWith('image/'));
+  const videoFiles = batch.filter(f => f.type.startsWith('video/'));
   if (!imageFiles.length && !videoFiles.length) return;
   let fromVideo = [];
   if (videoFiles.length) {
@@ -1578,7 +1615,12 @@ async function handleUploadFiles(fileList) {
     const failed = attempts.length - fromVideo.length;
     if (failed) toast(failed + ' vídeo(s) não puderam ser processados (formato não suportado pelo browser)');
   }
-  const files = [...imageFiles, ...fromVideo];
+  let files = [...imageFiles, ...fromVideo];
+  const spaceLeft = UPLOAD_LIMITS.maxTotalPhotos - (state.photos || []).length;
+  if (files.length > spaceLeft) {
+    toast('Limite de ' + UPLOAD_LIMITS.maxTotalPhotos + ' fotos por sessão atingido — só foram adicionadas ' + Math.max(0, spaceLeft));
+    files = files.slice(0, Math.max(0, spaceLeft));
+  }
   if (!files.length) { toast('Não foi possível carregar nenhum ficheiro.'); return; }
   const urls = files.map(f => URL.createObjectURL(f));
   state.photos = [...new Set([...(state.photos || []), ...urls])];
@@ -2801,19 +2843,47 @@ function renderBulkList() {
     if (!bulkState.itemData[x.id]) bulkState.itemData[x.id] = { title: state.title || '', price: state.price || '' };
   });
   const list = document.getElementById('bulkList');
-  if (!all.length) { list.innerHTML = '<div style="padding:14px;color:#888;font-size:0.8rem;">' + uiT('bulkEmptyMsg') + '</div>'; return; }
-  list.innerHTML = all.map(x => {
+  list.innerHTML = ''; // limpar é seguro — o que se segue é construído por DOM, não por string
+  if (!all.length) {
+    const empty = document.createElement('div');
+    empty.style.cssText = 'padding:14px;color:#888;font-size:0.8rem;';
+    empty.textContent = uiT('bulkEmptyMsg');
+    list.appendChild(empty);
+    return;
+  }
+  // Constrói por createElement/textContent/value, não por template string em innerHTML —
+  // title/price aqui são texto escrito livremente pela pessoa (produção em massa por item);
+  // uma vulnerabilidade real, confirmada e corrigida numa auditoria de segurança.
+  all.forEach(x => {
     const d = bulkState.itemData[x.id];
-    return `
-    <div style="display:flex;align-items:center;gap:8px;padding:7px 8px;border-radius:2px;">
-      <label class="check" style="margin:0;flex:0 0 auto;">
-        <input type="checkbox" ${bulkState.sel.has(x.id) ? 'checked' : ''} onchange="toggleBulkItem('${x.id}', this.checked)">
-        <span style="font-size:0.68rem;color:var(--text3);white-space:nowrap;">${x.label}</span>
-      </label>
-      <input type="text" value="${(d.title||'').replace(/"/g,'&quot;')}" placeholder="${uiT('titleLabel')}" aria-label="${uiT('titleLabel')}" oninput="bulkState.itemData['${x.id}'].title=this.value" style="flex:1;min-width:0;padding:5px 8px;font-size:0.74rem;">
-      <input type="text" value="${(d.price||'').replace(/"/g,'&quot;')}" placeholder="${uiT('priceLabel')}" aria-label="${uiT('priceLabel')}" oninput="bulkState.itemData['${x.id}'].price=this.value" style="width:90px;flex:0 0 auto;padding:5px 8px;font-size:0.74rem;">
-    </div>`;
-  }).join('');
+    const row = document.createElement('div');
+    row.style.cssText = 'display:flex;align-items:center;gap:8px;padding:7px 8px;border-radius:2px;';
+
+    const label = document.createElement('label');
+    label.className = 'check'; label.style.cssText = 'margin:0;flex:0 0 auto;';
+    const checkbox = document.createElement('input');
+    checkbox.type = 'checkbox'; checkbox.checked = bulkState.sel.has(x.id);
+    checkbox.addEventListener('change', () => toggleBulkItem(x.id, checkbox.checked));
+    const span = document.createElement('span');
+    span.style.cssText = 'font-size:0.68rem;color:var(--text3);white-space:nowrap;';
+    span.textContent = x.label;
+    label.appendChild(checkbox); label.appendChild(span);
+
+    const titleInput = document.createElement('input');
+    titleInput.type = 'text'; titleInput.value = d.title || ''; titleInput.placeholder = uiT('titleLabel');
+    titleInput.setAttribute('aria-label', uiT('titleLabel'));
+    titleInput.style.cssText = 'flex:1;min-width:0;padding:5px 8px;font-size:0.74rem;';
+    titleInput.addEventListener('input', () => { bulkState.itemData[x.id].title = titleInput.value; });
+
+    const priceInput = document.createElement('input');
+    priceInput.type = 'text'; priceInput.value = d.price || ''; priceInput.placeholder = uiT('priceLabel');
+    priceInput.setAttribute('aria-label', uiT('priceLabel'));
+    priceInput.style.cssText = 'width:90px;flex:0 0 auto;padding:5px 8px;font-size:0.74rem;';
+    priceInput.addEventListener('input', () => { bulkState.itemData[x.id].price = priceInput.value; });
+
+    row.appendChild(label); row.appendChild(titleInput); row.appendChild(priceInput);
+    list.appendChild(row);
+  });
   updateBulkCount();
 }
 function toggleBulkItem(id, on) { on ? bulkState.sel.add(id) : bulkState.sel.delete(id); updateBulkCount(); }

@@ -608,6 +608,44 @@ try {
   } catch (e) { assert('BLOCO 3r (parseEuroNumber respeita o idioma — regressão)  não rebentou', false, e.message + ' | ' + e.stack); }
 
   try {
+    // SEGURANÇA — nomes de Brand Kit e título/preço da produção em massa nunca
+    // podem ser interpretados como HTML/script, mesmo escrevendo algo hostil
+    const payload = '"><img src=x onerror="window.__xssFired=true">';
+    window.__xssFired = false;
+    // 1) Brand Kit — via prompt()
+    const originalPrompt = window.prompt;
+    window.prompt = () => payload;
+    await saveBrandKit(); await sleep(150);
+    window.prompt = originalPrompt;
+    await sleep(50);
+    assert('nome de Brand Kit hostil não executa script ao ser listado', window.__xssFired === false);
+    const optionText = [...document.getElementById('brandKitSelect').options].find(o => o.value === payload);
+    assert('nome de Brand Kit hostil aparece como TEXTO, não como HTML', !!optionText && optionText.textContent === payload, optionText && optionText.textContent);
+    const originalConfirm = window.confirm;
+    window.confirm = () => true;
+    document.getElementById('brandKitSelect').value = payload;
+    await deleteBrandKit(); await sleep(100);
+    window.confirm = originalConfirm;
+
+    // 2) Produção em massa — título/preço por foto
+    if (state.photos.length >= 1) {
+      openBulk(); await sleep(100);
+      window.__xssFired = false;
+      const firstId = bulkState.all[0] && bulkState.all[0].id;
+      if (firstId) {
+        bulkState.itemData[firstId].title = payload;
+        renderBulkList(); await sleep(80);
+        assert('título hostil na produção em massa não executa script ao voltar a desenhar', window.__xssFired === false);
+        const titleInput = document.querySelector('#bulkList input[type="text"]');
+        assert('título hostil aparece como valor de input, não como HTML', titleInput && titleInput.value === payload, titleInput && titleInput.value);
+        bulkState.itemData[firstId].title = '';
+        renderBulkList();
+      }
+      closeBulk();
+    }
+  } catch (e) { assert('BLOCO 3s (segurança — XSS em Brand Kit e produção em massa) não rebentou', false, e.message + ' | ' + e.stack); }
+
+  try {
     // limpar rascunho tem de repor tudo isto também — mas clearDraft() apaga
     // MESMO tudo (memória + IndexedDB), por isso este teste tem de restaurar
     // as fotos a seguir, para não afetar os testes de persistência mais à frente
