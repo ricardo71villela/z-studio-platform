@@ -176,7 +176,9 @@ input[type=range]::-moz-range-thumb {
 .slide-nav button { width:32px; height:32px; border-radius:50%; border:1px solid var(--border); background:none; color:var(--text2); cursor:pointer; font-size:0.9rem; transition:border-color .25s ease, color .25s ease, transform .15s ease; }
 .slide-nav button:hover { transform:scale(1.08); }
 .slide-nav button:hover { border-color:var(--gold); color:var(--gold); }
-.actions { display:flex; gap:10px; flex-wrap:wrap; justify-content:center; }
+.actions { display:grid; grid-template-columns:repeat(3, 1fr); gap:10px; }
+.actions .btn { width:100%; min-width:0; }
+@media (max-width: 620px) { .actions { grid-template-columns:repeat(2, 1fr); } .actions .btn { font-size:0.7rem; padding:11px 10px; } }
 .btn { padding:11px 22px; border-radius:2px; font-family:inherit; font-size:0.78rem; letter-spacing:0.14em; text-transform:uppercase; cursor:pointer; transition:transform .2s ease, box-shadow .3s ease, background-color .3s ease, border-color .3s ease, color .3s ease; }
 .btn-gold { background:var(--gold); border:1px solid var(--gold); color:#0A0A0A; }
 .btn-gold:hover { background:var(--gold-light); border-color:var(--gold-light); transform:translateY(-2px); box-shadow:0 10px 24px rgba(var(--gold-rgb),0.32); }
@@ -443,7 +445,7 @@ input[type=range]::-moz-range-thumb {
       <button class="btn btn-gold hide" id="btnCarousel" onclick="downloadCarousel()" data-i18n="carouselBtn">↓ Carrossel completo</button>
       <button class="btn btn-line" id="btnAllFormats" onclick="downloadAllFormats()" data-i18n="allFormatsBtn">↓ Todos os formatos (.zip)</button>
       <button class="btn btn-line" id="btnShare" onclick="sharePNG()" data-i18n="shareBtn">📤 Partilhar</button>
-      <button class="btn btn-line" id="btnVideo" onclick="generateVideoClip()" data-i18n="videoBtn">🎬 Vídeo (Stories/Reels/TikTok)</button>
+      <button class="btn btn-line" id="btnVideo" onclick="generateVideoClip()" data-i18n="videoBtn" data-i18n-title="videoBtnTitle" title="Vídeo curto para Stories, Reels e TikTok">🎬 Vídeo</button>
       <button class="btn btn-line" onclick="downloadPDF()" data-i18n="pdfBtn">↓ PDF</button>
       <button class="btn btn-line" onclick="copyCaption()" data-i18n="copyCaptionBtn">Copiar legenda</button>
     </div>
@@ -592,7 +594,7 @@ const UI_STRINGS = {
     cropAdjustLabel: 'Ajustar enquadramento (foto de capa)', cropAdjustReset: 'Repor',
     cropAdjustHint: 'Usa isto se o recorte automático não escolher bem — arrasta os controlos até a foto ficar como queres.',
     cropZoomLabel: 'Aproximação', cropPanXLabel: 'Posição horizontal', cropPanYLabel: 'Posição vertical',
-    videoBtn: '🎬 Vídeo (Stories/Reels/TikTok)', videoRecordingLabel: '⏺ A gravar…',
+    videoBtn: '🎬 Vídeo', videoBtnTitle: 'Vídeo curto para Stories, Reels e TikTok', videoRecordingLabel: '⏺ A gravar…',
     videoNeedsPhotoMsg: 'Carrega uma foto primeiro para gerar o vídeo', videoUnsupportedMsg: 'O teu browser não suporta gravação de vídeo — tenta noutro browser ou dispositivo',
     videoErrorMsg: 'Não foi possível gerar o vídeo. Tenta outra vez.'
   },
@@ -690,7 +692,7 @@ const UI_STRINGS = {
     cropAdjustLabel: 'Adjust framing (cover photo)', cropAdjustReset: 'Reset',
     cropAdjustHint: 'Use this if the automatic crop doesn\u2019t pick well — drag the controls until the photo looks right.',
     cropZoomLabel: 'Zoom', cropPanXLabel: 'Horizontal position', cropPanYLabel: 'Vertical position',
-    videoBtn: '🎬 Video (Stories/Reels/TikTok)', videoRecordingLabel: '⏺ Recording…',
+    videoBtn: '🎬 Video', videoBtnTitle: 'Short video for Stories, Reels and TikTok', videoRecordingLabel: '⏺ Recording…',
     videoNeedsPhotoMsg: 'Upload a photo first to generate the video', videoUnsupportedMsg: 'Your browser doesn’t support video recording — try another browser or device',
     videoErrorMsg: 'Could not generate the video. Try again.'
   },
@@ -788,7 +790,7 @@ const UI_STRINGS = {
     cropAdjustLabel: 'Ajuster le cadrage (photo de couverture)', cropAdjustReset: 'Réinitialiser',
     cropAdjustHint: 'Utilise ceci si le recadrage automatique ne choisit pas bien — fais glisser les curseurs jusqu\u2019à ce que la photo te convienne.',
     cropZoomLabel: 'Zoom', cropPanXLabel: 'Position horizontale', cropPanYLabel: 'Position verticale',
-    videoBtn: '🎬 Vidéo (Stories/Reels/TikTok)', videoRecordingLabel: '⏺ Enregistrement…',
+    videoBtn: '🎬 Vidéo', videoBtnTitle: 'Courte vidéo pour Stories, Reels et TikTok', videoRecordingLabel: '⏺ Enregistrement…',
     videoNeedsPhotoMsg: 'Charge une photo avant de générer la vidéo', videoUnsupportedMsg: 'Ton navigateur ne prend pas en charge l’enregistrement vidéo — essaie un autre navigateur ou appareil',
     videoErrorMsg: 'Impossible de générer la vidéo. Réessaie.'
   },
@@ -886,7 +888,7 @@ const UI_STRINGS = {
     cropAdjustLabel: 'Ajustar el encuadre (foto de portada)', cropAdjustReset: 'Restablecer',
     cropAdjustHint: 'Usa esto si el recorte automático no acierta — arrastra los controles hasta que la foto quede como quieres.',
     cropZoomLabel: 'Zoom', cropPanXLabel: 'Posición horizontal', cropPanYLabel: 'Posición vertical',
-    videoBtn: '🎬 Vídeo (Stories/Reels/TikTok)', videoRecordingLabel: '⏺ Grabando…',
+    videoBtn: '🎬 Vídeo', videoBtnTitle: 'Vídeo corto para Stories, Reels y TikTok', videoRecordingLabel: '⏺ Grabando…',
     videoNeedsPhotoMsg: 'Sube una foto primero para generar el vídeo', videoUnsupportedMsg: 'Tu navegador no admite grabación de vídeo — prueba con otro navegador o dispositivo',
     videoErrorMsg: 'No se pudo generar el vídeo. Inténtalo de nuevo.'
   },
@@ -984,7 +986,7 @@ const UI_STRINGS = {
     cropAdjustLabel: 'Bildausschnitt anpassen (Titelfoto)', cropAdjustReset: 'Zurücksetzen',
     cropAdjustHint: 'Nutze dies, wenn der automatische Zuschnitt nicht passt — verschiebe die Regler, bis das Foto so aussieht, wie du es möchtest.',
     cropZoomLabel: 'Zoom', cropPanXLabel: 'Horizontale Position', cropPanYLabel: 'Vertikale Position',
-    videoBtn: '🎬 Video (Stories/Reels/TikTok)', videoRecordingLabel: '⏺ Aufnahme läuft…',
+    videoBtn: '🎬 Video', videoBtnTitle: 'Kurzvideo für Stories, Reels und TikTok', videoRecordingLabel: '⏺ Aufnahme läuft…',
     videoNeedsPhotoMsg: 'Lade zuerst ein Foto hoch, um das Video zu erstellen', videoUnsupportedMsg: 'Dein Browser unterstützt keine Videoaufnahme — versuche einen anderen Browser oder ein anderes Gerät',
     videoErrorMsg: 'Video konnte nicht erstellt werden. Versuche es erneut.'
   },
@@ -1082,7 +1084,7 @@ const UI_STRINGS = {
     cropAdjustLabel: 'Regola l\u2019inquadratura (foto di copertina)', cropAdjustReset: 'Ripristina',
     cropAdjustHint: 'Usa questa funzione se il ritaglio automatico non è quello giusto — trascina i controlli finché la foto non ti soddisfa.',
     cropZoomLabel: 'Zoom', cropPanXLabel: 'Posizione orizzontale', cropPanYLabel: 'Posizione verticale',
-    videoBtn: '🎬 Video (Stories/Reels/TikTok)', videoRecordingLabel: '⏺ Registrazione…',
+    videoBtn: '🎬 Video', videoBtnTitle: 'Video breve per Stories, Reels e TikTok', videoRecordingLabel: '⏺ Registrazione…',
     videoNeedsPhotoMsg: 'Carica prima una foto per generare il video', videoUnsupportedMsg: 'Il tuo browser non supporta la registrazione video — prova un altro browser o dispositivo',
     videoErrorMsg: 'Impossibile generare il video. Riprova.'
   }

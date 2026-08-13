@@ -176,7 +176,9 @@ input[type=range]::-moz-range-thumb {
 .slide-nav button { width:32px; height:32px; border-radius:50%; border:1px solid var(--border); background:none; color:var(--text2); cursor:pointer; font-size:0.9rem; transition:border-color .25s ease, color .25s ease, transform .15s ease; }
 .slide-nav button:hover { transform:scale(1.08); }
 .slide-nav button:hover { border-color:var(--gold); color:var(--gold); }
-.actions { display:flex; gap:10px; flex-wrap:wrap; justify-content:center; }
+.actions { display:grid; grid-template-columns:repeat(3, 1fr); gap:10px; }
+.actions .btn { width:100%; min-width:0; }
+@media (max-width: 620px) { .actions { grid-template-columns:repeat(2, 1fr); } .actions .btn { font-size:0.7rem; padding:11px 10px; } }
 .btn { padding:11px 22px; border-radius:2px; font-family:inherit; font-size:0.78rem; letter-spacing:0.14em; text-transform:uppercase; cursor:pointer; transition:transform .2s ease, box-shadow .3s ease, background-color .3s ease, border-color .3s ease, color .3s ease; }
 .btn-gold { background:var(--gold); border:1px solid var(--gold); color:#0A0A0A; }
 .btn-gold:hover { background:var(--gold-light); border-color:var(--gold-light); transform:translateY(-2px); box-shadow:0 10px 24px rgba(var(--gold-rgb),0.32); }
@@ -443,7 +445,7 @@ input[type=range]::-moz-range-thumb {
       <button class="btn btn-gold hide" id="btnCarousel" onclick="downloadCarousel()" data-i18n="carouselBtn">↓ Carrossel completo</button>
       <button class="btn btn-line" id="btnAllFormats" onclick="downloadAllFormats()" data-i18n="allFormatsBtn">↓ Todos os formatos (.zip)</button>
       <button class="btn btn-line" id="btnShare" onclick="sharePNG()" data-i18n="shareBtn">📤 Partilhar</button>
-      <button class="btn btn-line" id="btnVideo" onclick="generateVideoClip()" data-i18n="videoBtn">🎬 Vídeo (Stories/Reels/TikTok)</button>
+      <button class="btn btn-line" id="btnVideo" onclick="generateVideoClip()" data-i18n="videoBtn" data-i18n-title="videoBtnTitle" title="Vídeo curto para Stories, Reels e TikTok">🎬 Vídeo</button>
       <button class="btn btn-line" onclick="downloadPDF()" data-i18n="pdfBtn">↓ PDF</button>
       <button class="btn btn-line" onclick="copyCaption()" data-i18n="copyCaptionBtn">Copiar legenda</button>
     </div>
