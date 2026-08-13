@@ -129,7 +129,8 @@ const UI_STRINGS = {
     cropZoomLabel: 'Aproximação', cropPanXLabel: 'Posição horizontal', cropPanYLabel: 'Posição vertical',
     videoBtn: '🎬 Vídeo', videoBtnTitle: 'Vídeo curto para Stories, Reels e TikTok', videoRecordingLabel: '⏺ A gravar…',
     videoNeedsPhotoMsg: 'Carrega uma foto primeiro para gerar o vídeo', videoUnsupportedMsg: 'O teu browser não suporta gravação de vídeo — tenta noutro browser ou dispositivo',
-    videoErrorMsg: 'Não foi possível gerar o vídeo. Tenta outra vez.'
+    videoErrorMsg: 'Não foi possível gerar o vídeo. Tenta outra vez.',
+    footerTerms: 'Termos de Serviço', footerPrivacy: 'Privacidade'
   },
 
   en: {
@@ -227,7 +228,8 @@ const UI_STRINGS = {
     cropZoomLabel: 'Zoom', cropPanXLabel: 'Horizontal position', cropPanYLabel: 'Vertical position',
     videoBtn: '🎬 Video', videoBtnTitle: 'Short video for Stories, Reels and TikTok', videoRecordingLabel: '⏺ Recording…',
     videoNeedsPhotoMsg: 'Upload a photo first to generate the video', videoUnsupportedMsg: 'Your browser doesn’t support video recording — try another browser or device',
-    videoErrorMsg: 'Could not generate the video. Try again.'
+    videoErrorMsg: 'Could not generate the video. Try again.',
+    footerTerms: 'Terms of Service', footerPrivacy: 'Privacy'
   },
 
   fr: {
@@ -325,7 +327,8 @@ const UI_STRINGS = {
     cropZoomLabel: 'Zoom', cropPanXLabel: 'Position horizontale', cropPanYLabel: 'Position verticale',
     videoBtn: '🎬 Vidéo', videoBtnTitle: 'Courte vidéo pour Stories, Reels et TikTok', videoRecordingLabel: '⏺ Enregistrement…',
     videoNeedsPhotoMsg: 'Charge une photo avant de générer la vidéo', videoUnsupportedMsg: 'Ton navigateur ne prend pas en charge l’enregistrement vidéo — essaie un autre navigateur ou appareil',
-    videoErrorMsg: 'Impossible de générer la vidéo. Réessaie.'
+    videoErrorMsg: 'Impossible de générer la vidéo. Réessaie.',
+    footerTerms: 'Conditions d\u2019utilisation', footerPrivacy: 'Confidentialité'
   },
 
   es: {
@@ -423,7 +426,8 @@ const UI_STRINGS = {
     cropZoomLabel: 'Zoom', cropPanXLabel: 'Posición horizontal', cropPanYLabel: 'Posición vertical',
     videoBtn: '🎬 Vídeo', videoBtnTitle: 'Vídeo corto para Stories, Reels y TikTok', videoRecordingLabel: '⏺ Grabando…',
     videoNeedsPhotoMsg: 'Sube una foto primero para generar el vídeo', videoUnsupportedMsg: 'Tu navegador no admite grabación de vídeo — prueba con otro navegador o dispositivo',
-    videoErrorMsg: 'No se pudo generar el vídeo. Inténtalo de nuevo.'
+    videoErrorMsg: 'No se pudo generar el vídeo. Inténtalo de nuevo.',
+    footerTerms: 'Términos de Servicio', footerPrivacy: 'Privacidad'
   },
 
   de: {
@@ -521,7 +525,8 @@ const UI_STRINGS = {
     cropZoomLabel: 'Zoom', cropPanXLabel: 'Horizontale Position', cropPanYLabel: 'Vertikale Position',
     videoBtn: '🎬 Video', videoBtnTitle: 'Kurzvideo für Stories, Reels und TikTok', videoRecordingLabel: '⏺ Aufnahme läuft…',
     videoNeedsPhotoMsg: 'Lade zuerst ein Foto hoch, um das Video zu erstellen', videoUnsupportedMsg: 'Dein Browser unterstützt keine Videoaufnahme — versuche einen anderen Browser oder ein anderes Gerät',
-    videoErrorMsg: 'Video konnte nicht erstellt werden. Versuche es erneut.'
+    videoErrorMsg: 'Video konnte nicht erstellt werden. Versuche es erneut.',
+    footerTerms: 'Nutzungsbedingungen', footerPrivacy: 'Datenschutz'
   },
 
   it: {
@@ -619,6 +624,7 @@ const UI_STRINGS = {
     cropZoomLabel: 'Zoom', cropPanXLabel: 'Posizione orizzontale', cropPanYLabel: 'Posizione verticale',
     videoBtn: '🎬 Video', videoBtnTitle: 'Video breve per Stories, Reels e TikTok', videoRecordingLabel: '⏺ Registrazione…',
     videoNeedsPhotoMsg: 'Carica prima una foto per generare il video', videoUnsupportedMsg: 'Il tuo browser non supporta la registrazione video — prova un altro browser o dispositivo',
-    videoErrorMsg: 'Impossibile generare il video. Riprova.'
+    videoErrorMsg: 'Impossibile generare il video. Riprova.',
+    footerTerms: 'Termini di Servizio', footerPrivacy: 'Privacy'
   }
 };
