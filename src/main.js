@@ -1811,6 +1811,152 @@ async function downloadPNG() {
 // Partilha direta (telemóvel) — abre o menu nativo do sistema (Instagram, WhatsApp, etc.)
 // em vez de só descarregar o ficheiro. Cai para o download normal se o browser não suportar.
 // ═══ platform/web vs platform/capacitor — partilhar ═══
+// ═══════════════════════════════════════════════════════════════
+//  VÍDEO CURTO (Stories / Reels / TikTok) — 100% no browser, sem
+//  servidor nenhum. Anima a foto de capa com um Ken Burns ligeiro
+//  (reaproveita o próprio sistema de ajuste de enquadramento que já
+//  existe, só que animado) e o texto a entrar em cascata. Grava com
+//  MediaRecorder + canvas.captureStream() — testado e confirmado a
+//  produzir MP4/H.264 real (verificado com ffprobe), o mesmo formato
+//  que o Safari no iOS já escreve nativamente desde 2021.
+// ═══════════════════════════════════════════════════════════════
+function easeOutCubic(p) { return 1 - Math.pow(1 - p, 3); }
+function fadeProgress(tMs, startMs, durMs) { return Math.max(0, Math.min(1, (tMs - startMs) / durMs)); }
+
+async function generateVideoClip() {
+  if (!state.img) { toast(uiT('videoNeedsPhotoMsg')); return; }
+  if (!window.MediaRecorder || typeof HTMLCanvasElement.prototype.captureStream !== 'function') {
+    toast(uiT('videoUnsupportedMsg'));
+    return;
+  }
+  const mimeCandidates = ['video/mp4;codecs=avc1', 'video/mp4', 'video/webm;codecs=vp9', 'video/webm'];
+  const mimeType = mimeCandidates.find(t => MediaRecorder.isTypeSupported(t));
+  if (!mimeType) { toast(uiT('videoUnsupportedMsg')); return; }
+
+  const btn = document.getElementById('btnVideo');
+  const originalLabel = btn ? btn.textContent : '';
+  if (btn) { btn.disabled = true; btn.textContent = uiT('videoRecordingLabel'); }
+
+  const DURATION_MS = 6000;
+  const FPS = 30;
+  const W = 1080, H = 1920; // vertical — Stories/Reels/TikTok usam todos este formato
+  const FS = Math.sqrt((W * H) / (1080 * 1350));
+  const canvas = document.createElement('canvas');
+  canvas.width = W; canvas.height = H;
+  const ctx = canvas.getContext('2d');
+
+  // guarda o ajuste de enquadramento atual desta foto — o vídeo usa o MESMO
+  // mecanismo (getCropAdjust/smartCoverDraw), só que o zoom vai animado.
+  // Repõe exatamente como estava no fim, para não alterar nada do que a
+  // pessoa já tinha ajustado à mão.
+  const savedAdjust = state.cropAdjust[state.photo] ? { ...state.cropAdjust[state.photo] } : null;
+  const locLine = state.loc || '';
+
+  function drawVideoFrame(tMs) {
+    const p = Math.min(1, tMs / DURATION_MS);
+    state.cropAdjust[state.photo] = { panX: 0.5, panY: 0.5, zoom: 1.0 + 0.12 * easeOutCubic(p) };
+    const P = pal();
+
+    smartCoverDraw(ctx, state.img, 0, 0, W, H, true);
+    const g = ctx.createLinearGradient(0, H * 0.42, 0, H);
+    g.addColorStop(0, `rgba(${P.gradRGB},0)`); g.addColorStop(0.6, `rgba(${P.gradRGB},0.78)`); g.addColorStop(1, `rgba(${P.gradRGB},0.97)`);
+    ctx.fillStyle = g; ctx.fillRect(0, 0, W, H);
+    const gt = ctx.createLinearGradient(0, 0, 0, H * 0.24);
+    gt.addColorStop(0, `rgba(${P.gradRGB},0.6)`); gt.addColorStop(1, `rgba(${P.gradRGB},0)`);
+    ctx.fillStyle = gt; ctx.fillRect(0, 0, W, H * 0.24);
+
+    const badgeP = fadeProgress(tMs, 200, 500);
+    if (state.badge && badgeP > 0) {
+      ctx.save(); ctx.globalAlpha = badgeP;
+      ctx.font = `400 ${26*FS}px "DM Sans", sans-serif`; ctx.fillStyle = P.overPhoto;
+      spaced(ctx, state.badge.toUpperCase(), W / 2, 200, 8*FS);
+      ctx.restore();
+    }
+    drawLogo(ctx, W / 2, 130, 0.9, P.overPhoto);
+
+    const textP = fadeProgress(tMs, 700, 600);
+    if (textP > 0) {
+      ctx.save();
+      ctx.globalAlpha = textP;
+      ctx.translate(0, (1 - textP) * 24);
+      ctx.textAlign = 'center';
+      const footerY = H - 64;
+      const specs = state.showSpecs ? specsLine() : '';
+      ctx.font = `300 ${40*FS}px "DM Sans", sans-serif`;
+      const tLines = wrapN(ctx, state.title, W - 180, 2);
+
+      let cursor = footerY - 90;
+      let specsY = null;
+      if (specs) { specsY = cursor; cursor = specsY - 84*FS; }
+      const locY = cursor; cursor = locY - 58*FS;
+      const titleYs = [];
+      for (let i = tLines.length - 1; i >= 0; i--) { titleYs.unshift(cursor); cursor -= 52*FS; }
+      const priceY = cursor - 30*FS;
+
+      ctx.fillStyle = P.goldBig;
+      const ps = fitText(ctx, state.price, W - 160, '500 SIZEpx "Cormorant Garamond", serif', 48*FS, 96*FS);
+      ctx.font = `500 ${ps}px "Cormorant Garamond", serif`;
+      ctx.fillText(state.price, W / 2, priceY);
+
+      ctx.fillStyle = P.ink; ctx.font = `300 ${40*FS}px "DM Sans", sans-serif`;
+      tLines.forEach((l, i) => ctx.fillText(l, W / 2, titleYs[i]));
+
+      ctx.fillStyle = P.muted; ctx.font = `300 ${30*FS}px "DM Sans", sans-serif`;
+      ctx.fillText('📍 ' + locLine, W / 2, locY);
+
+      if (specs) {
+        ctx.strokeStyle = P.rule; ctx.lineWidth = 1;
+        ctx.beginPath(); ctx.moveTo(W/2 - 200*FS, specsY - 42*FS); ctx.lineTo(W/2 + 200*FS, specsY - 42*FS); ctx.stroke();
+        ctx.fillStyle = P.gold;
+        const ss = fitText(ctx, specs, W - 140*FS, '300 SIZEpx "DM Sans", sans-serif', 15*FS, 28*FS);
+        ctx.font = `300 ${ss}px "DM Sans", sans-serif`;
+        ctx.fillText(specs, W / 2, specsY);
+      }
+      watermark(() => {
+        ctx.fillStyle = P.faint; ctx.font = `300 ${22*FS}px "DM Sans", sans-serif`;
+        ctx.fillText(footerLine(), W / 2, footerY);
+      });
+      ctx.restore();
+    }
+  }
+
+  try {
+    const stream = canvas.captureStream(FPS);
+    const recorder = new MediaRecorder(stream, { mimeType, videoBitsPerSecond: 5_000_000 });
+    const chunks = [];
+    recorder.ondataavailable = (e) => { if (e.data.size > 0) chunks.push(e.data); };
+    const recordedDone = new Promise(resolve => { recorder.onstop = resolve; });
+    recorder.start();
+
+    const t0 = performance.now();
+    await new Promise(resolve => {
+      function tick() {
+        const elapsed = performance.now() - t0;
+        drawVideoFrame(elapsed);
+        if (elapsed < DURATION_MS) requestAnimationFrame(tick);
+        else resolve();
+      }
+      requestAnimationFrame(tick);
+    });
+    recorder.stop();
+    await recordedDone;
+
+    const blob = new Blob(chunks, { type: mimeType });
+    const ext = mimeType.includes('mp4') ? 'mp4' : 'webm';
+    await saveBlob(blob, 'my-studio-video-' + Date.now() + '.' + ext);
+  } catch (e) {
+    console.error('[vídeo] falha ao gravar:', e);
+    toast(uiT('videoErrorMsg'));
+  } finally {
+    // repõe o ajuste de enquadramento exatamente como estava — o vídeo não
+    // pode deixar rasto no que a pessoa já tinha ajustado à mão
+    if (savedAdjust) state.cropAdjust[state.photo] = savedAdjust;
+    else delete state.cropAdjust[state.photo];
+    draw();
+    if (btn) { btn.disabled = false; btn.textContent = originalLabel; }
+  }
+}
+
 async function sharePNG() {
   const c = document.getElementById('preview');
   try {

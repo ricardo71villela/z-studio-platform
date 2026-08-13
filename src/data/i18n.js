@@ -126,7 +126,10 @@ const UI_STRINGS = {
     financeFromBadgePrefix: 'A partir de',
     cropAdjustLabel: 'Ajustar enquadramento (foto de capa)', cropAdjustReset: 'Repor',
     cropAdjustHint: 'Usa isto se o recorte automático não escolher bem — arrasta os controlos até a foto ficar como queres.',
-    cropZoomLabel: 'Aproximação', cropPanXLabel: 'Posição horizontal', cropPanYLabel: 'Posição vertical'
+    cropZoomLabel: 'Aproximação', cropPanXLabel: 'Posição horizontal', cropPanYLabel: 'Posição vertical',
+    videoBtn: '🎬 Vídeo (Stories/Reels/TikTok)', videoRecordingLabel: '⏺ A gravar…',
+    videoNeedsPhotoMsg: 'Carrega uma foto primeiro para gerar o vídeo', videoUnsupportedMsg: 'O teu browser não suporta gravação de vídeo — tenta noutro browser ou dispositivo',
+    videoErrorMsg: 'Não foi possível gerar o vídeo. Tenta outra vez.'
   },
 
   en: {
@@ -221,7 +224,10 @@ const UI_STRINGS = {
     financeFromBadgePrefix: 'From',
     cropAdjustLabel: 'Adjust framing (cover photo)', cropAdjustReset: 'Reset',
     cropAdjustHint: 'Use this if the automatic crop doesn\u2019t pick well — drag the controls until the photo looks right.',
-    cropZoomLabel: 'Zoom', cropPanXLabel: 'Horizontal position', cropPanYLabel: 'Vertical position'
+    cropZoomLabel: 'Zoom', cropPanXLabel: 'Horizontal position', cropPanYLabel: 'Vertical position',
+    videoBtn: '🎬 Video (Stories/Reels/TikTok)', videoRecordingLabel: '⏺ Recording…',
+    videoNeedsPhotoMsg: 'Upload a photo first to generate the video', videoUnsupportedMsg: 'Your browser doesn’t support video recording — try another browser or device',
+    videoErrorMsg: 'Could not generate the video. Try again.'
   },
 
   fr: {
@@ -316,7 +322,10 @@ const UI_STRINGS = {
     financeFromBadgePrefix: 'À partir de',
     cropAdjustLabel: 'Ajuster le cadrage (photo de couverture)', cropAdjustReset: 'Réinitialiser',
     cropAdjustHint: 'Utilise ceci si le recadrage automatique ne choisit pas bien — fais glisser les curseurs jusqu\u2019à ce que la photo te convienne.',
-    cropZoomLabel: 'Zoom', cropPanXLabel: 'Position horizontale', cropPanYLabel: 'Position verticale'
+    cropZoomLabel: 'Zoom', cropPanXLabel: 'Position horizontale', cropPanYLabel: 'Position verticale',
+    videoBtn: '🎬 Vidéo (Stories/Reels/TikTok)', videoRecordingLabel: '⏺ Enregistrement…',
+    videoNeedsPhotoMsg: 'Charge une photo avant de générer la vidéo', videoUnsupportedMsg: 'Ton navigateur ne prend pas en charge l’enregistrement vidéo — essaie un autre navigateur ou appareil',
+    videoErrorMsg: 'Impossible de générer la vidéo. Réessaie.'
   },
 
   es: {
@@ -411,7 +420,10 @@ const UI_STRINGS = {
     financeFromBadgePrefix: 'Desde',
     cropAdjustLabel: 'Ajustar el encuadre (foto de portada)', cropAdjustReset: 'Restablecer',
     cropAdjustHint: 'Usa esto si el recorte automático no acierta — arrastra los controles hasta que la foto quede como quieres.',
-    cropZoomLabel: 'Zoom', cropPanXLabel: 'Posición horizontal', cropPanYLabel: 'Posición vertical'
+    cropZoomLabel: 'Zoom', cropPanXLabel: 'Posición horizontal', cropPanYLabel: 'Posición vertical',
+    videoBtn: '🎬 Vídeo (Stories/Reels/TikTok)', videoRecordingLabel: '⏺ Grabando…',
+    videoNeedsPhotoMsg: 'Sube una foto primero para generar el vídeo', videoUnsupportedMsg: 'Tu navegador no admite grabación de vídeo — prueba con otro navegador o dispositivo',
+    videoErrorMsg: 'No se pudo generar el vídeo. Inténtalo de nuevo.'
   },
 
   de: {
@@ -506,7 +518,10 @@ const UI_STRINGS = {
     financeFromBadgePrefix: 'Ab',
     cropAdjustLabel: 'Bildausschnitt anpassen (Titelfoto)', cropAdjustReset: 'Zurücksetzen',
     cropAdjustHint: 'Nutze dies, wenn der automatische Zuschnitt nicht passt — verschiebe die Regler, bis das Foto so aussieht, wie du es möchtest.',
-    cropZoomLabel: 'Zoom', cropPanXLabel: 'Horizontale Position', cropPanYLabel: 'Vertikale Position'
+    cropZoomLabel: 'Zoom', cropPanXLabel: 'Horizontale Position', cropPanYLabel: 'Vertikale Position',
+    videoBtn: '🎬 Video (Stories/Reels/TikTok)', videoRecordingLabel: '⏺ Aufnahme läuft…',
+    videoNeedsPhotoMsg: 'Lade zuerst ein Foto hoch, um das Video zu erstellen', videoUnsupportedMsg: 'Dein Browser unterstützt keine Videoaufnahme — versuche einen anderen Browser oder ein anderes Gerät',
+    videoErrorMsg: 'Video konnte nicht erstellt werden. Versuche es erneut.'
   },
 
   it: {
@@ -601,6 +616,9 @@ const UI_STRINGS = {
     financeFromBadgePrefix: 'A partire da',
     cropAdjustLabel: 'Regola l\u2019inquadratura (foto di copertina)', cropAdjustReset: 'Ripristina',
     cropAdjustHint: 'Usa questa funzione se il ritaglio automatico non è quello giusto — trascina i controlli finché la foto non ti soddisfa.',
-    cropZoomLabel: 'Zoom', cropPanXLabel: 'Posizione orizzontale', cropPanYLabel: 'Posizione verticale'
+    cropZoomLabel: 'Zoom', cropPanXLabel: 'Posizione orizzontale', cropPanYLabel: 'Posizione verticale',
+    videoBtn: '🎬 Video (Stories/Reels/TikTok)', videoRecordingLabel: '⏺ Registrazione…',
+    videoNeedsPhotoMsg: 'Carica prima una foto per generare il video', videoUnsupportedMsg: 'Il tuo browser non supporta la registrazione video — prova un altro browser o dispositivo',
+    videoErrorMsg: 'Impossibile generare il video. Riprova.'
   }
 };

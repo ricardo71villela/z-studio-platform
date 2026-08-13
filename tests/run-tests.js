@@ -690,6 +690,45 @@ try {
   } catch (e) { assert('BLOCO 3v (abstração de plataforma — caminho web) não rebentou', false, e.message + ' | ' + e.stack); }
 
   try {
+    // VÍDEO CURTO (Stories/Reels/TikTok) — gera de verdade e confirma um
+    // ficheiro de vídeo válido, não só que a função correu sem exceção.
+    assert('deteção de suporte a vídeo existe', typeof MediaRecorder !== 'undefined' && typeof HTMLCanvasElement.prototype.captureStream === 'function');
+
+    if (state.photos.length === 0) {
+      const f = await new Promise(res => {
+        const c = document.createElement('canvas'); c.width = 200; c.height = 200;
+        c.getContext('2d').fillRect(0, 0, 200, 200);
+        c.toBlob(b => res(new File([b], 'v.png', { type: 'image/png' })), 'image/png');
+      });
+      await handleUploadFiles([f]);
+      await sleep(150);
+    }
+    document.getElementById('fTitle').value = 'Teste de Vídeo'; state.title = 'Teste de Vídeo';
+    document.getElementById('fPrice').value = '99€'; state.price = '99€';
+
+    let captured = null;
+    const originalSaveBlobWeb = saveBlobWeb;
+    window.saveBlobWeb = function(blob, name) { captured = { blob, name }; };
+    const savedAdjustBefore = state.cropAdjust[state.photo] ? { ...state.cropAdjust[state.photo] } : null;
+
+    await generateVideoClip();
+
+    window.saveBlobWeb = originalSaveBlobWeb;
+    assert('gerar vídeo produz um ficheiro (chama saveBlob)', !!captured);
+    if (captured) {
+      assert('o ficheiro de vídeo tem conteúdo real (não está vazio)', captured.blob.size > 1000, captured.blob.size);
+      assert('o tipo MIME é mesmo de vídeo', captured.blob.type.startsWith('video/'), captured.blob.type);
+      assert('o nome do ficheiro tem extensão de vídeo', /\.(mp4|webm)$/.test(captured.name), captured.name);
+    }
+    // gerar o vídeo não pode deixar rasto no ajuste de enquadramento desta foto
+    const adjustAfter = state.cropAdjust[state.photo] ? { ...state.cropAdjust[state.photo] } : null;
+    assert('gerar vídeo repõe o ajuste de enquadramento exatamente como estava antes',
+      JSON.stringify(savedAdjustBefore) === JSON.stringify(adjustAfter), { antes: savedAdjustBefore, depois: adjustAfter });
+    const btn = document.getElementById('btnVideo');
+    assert('o botão de vídeo volta a ficar ativo depois de gerar', btn && !btn.disabled);
+  } catch (e) { assert('BLOCO 3w (vídeo curto Stories/Reels/TikTok) não rebentou', false, e.message + ' | ' + e.stack); }
+
+  try {
     // limpar rascunho tem de repor tudo isto também — mas clearDraft() apaga
     // MESMO tudo (memória + IndexedDB), por isso este teste tem de restaurar
     // as fotos a seguir, para não afetar os testes de persistência mais à frente
