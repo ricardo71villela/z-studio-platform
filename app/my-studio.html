@@ -462,307 +462,14 @@ input[type=range]::-moz-range-thumb {
 <div class="toast" id="toast" role="status" aria-live="polite"></div>
 
 <script>
-// ═══ ESTADO ═══
-const FORMATS = { feed45: [1080, 1350], square: [1080, 1080], story: [1080, 1920], wide: [1920, 1080], pin: [1000, 1500] };
-const state = {
-  lang: 'pt', source: 'upload', format: 'feed45', template: 'classico',
-  photo: null, img: null,
-  title: '', price: '', loc: '', badge: '', showSpecs: true, bg: 'dark',
-  photos: [], carPhotos: [], photoFiles: [],
-  slides: [], slideIdx: 0,
-  // recorte inteligente + filtro de imagem (nome do preset em PHOTO_FILTERS)
-  smartCrop: true, filter: 'auto',
-  cropAdjust: {}, // { [urlDaFoto]: {panX, panY, zoom} } — ajuste manual de enquadramento, por foto
-  // categoria + ficha de produto — universal: imóveis, carros, viagens, cosmética,
-  // roupa, sapatos, ou qualquer outra coisa. Rótulos e valores totalmente editáveis.
-  category: 'generico',
-  _styleCustomized: false, // true assim que a pessoa escolhe cor/fundo à mão — a partir daí a categoria deixa de sugerir automaticamente
-  // campos extra específicos de certas categorias — só aparecem/contam quando
-  // a categoria ativa os usa (ver renderCategoryExtras)
-  energyRating: '', starRating: 0, allergens: [], sizes: [],
-  financeMonths: 60, financeDownPct: 20, financeAPR: 7.9,
-  spec: [ { label: '', value: '' }, { label: '', value: '' }, { label: '', value: '' }, { label: '', value: '' } ],
-  // marca — nome, cor, site, com ou sem marca de água
-  brand: { name: 'My Studio', site: '', sub: '', phone: '', accent: '#B8935A',
-           showWatermark: true, logoUrl: null, langs: new Set(['pt', 'en']) }
-};
-
-// ═══════════════════════════════════════════════════════════════
-//  RASCUNHO LOCAL (IndexedDB) — guarda automaticamente as fotos
-//  carregadas, textos e marca no browser, para não se perder nada
-//  se a página for fechada ou recarregada por acidente. Fica só
-//  neste dispositivo — nunca é enviado para lado nenhum.
-// ═══════════════════════════════════════════════════════════════
-const DRAFT_DB = 'zstudio-draft', DRAFT_STORE = 'kv';
-function idbOpen() {
-  return new Promise((resolve, reject) => {
-    if (!window.indexedDB) { reject(new Error('IndexedDB indisponível')); return; }
-    const req = indexedDB.open(DRAFT_DB, 1);
-    req.onupgradeneeded = () => req.result.createObjectStore(DRAFT_STORE);
-    req.onsuccess = () => resolve(req.result);
-    req.onerror = () => reject(req.error);
-  });
-}
-async function idbSet(key, value) {
-  const db = await idbOpen();
-  return new Promise((resolve, reject) => {
-    const tx = db.transaction(DRAFT_STORE, 'readwrite');
-    tx.objectStore(DRAFT_STORE).put(value, key);
-    tx.oncomplete = () => resolve();
-    tx.onerror = () => reject(tx.error);
-  });
-}
-async function idbGet(key) {
-  const db = await idbOpen();
-  return new Promise((resolve, reject) => {
-    const tx = db.transaction(DRAFT_STORE, 'readonly');
-    const req = tx.objectStore(DRAFT_STORE).get(key);
-    req.onsuccess = () => resolve(req.result);
-    req.onerror = () => reject(req.error);
-  });
-}
-async function idbDelete(key) {
-  const db = await idbOpen();
-  return new Promise((resolve, reject) => {
-    const tx = db.transaction(DRAFT_STORE, 'readwrite');
-    tx.objectStore(DRAFT_STORE).delete(key);
-    tx.oncomplete = () => resolve();
-    tx.onerror = () => reject(tx.error);
-  });
-}
-
-let _saveDraftTimer = null;
-// Contador de geração: uma limpeza de rascunho incrementa isto, para que uma
-// gravação automática que já estava "em voo" (ex.: a meio da compressão de uma
-// foto) não ressuscite dados que acabaram de ser apagados.
-let _draftGeneration = 0;
-function scheduleSaveDraft() {
-  clearTimeout(_saveDraftTimer);
-  _saveDraftTimer = setTimeout(saveDraft, 900);
-}
-// Reduz o tamanho das fotos antes de as guardar localmente — sem isto, fotos de
-// telemóvel em alta resolução esgotam depressa o espaço do browser. A foto original
-// usada na edição/exportação nunca é tocada, isto é só para a cópia do rascunho.
-const compressedCache = new WeakMap();
-function compressImageFile(file, maxDim, quality) {
-  if (compressedCache.has(file)) return Promise.resolve(compressedCache.get(file));
-  return new Promise((resolve) => {
-    const img = new Image();
-    const url = URL.createObjectURL(file);
-    img.onload = () => {
-      let { width, height } = img;
-      const scale = Math.min(1, maxDim / Math.max(width, height));
-      width = Math.max(1, Math.round(width * scale)); height = Math.max(1, Math.round(height * scale));
-      const c = document.createElement('canvas'); c.width = width; c.height = height;
-      c.getContext('2d').drawImage(img, 0, 0, width, height);
-      c.toBlob(blob => {
-        URL.revokeObjectURL(url);
-        const result = blob || file;
-        compressedCache.set(file, result);
-        resolve(result);
-      }, 'image/jpeg', quality);
-    };
-    img.onerror = () => { URL.revokeObjectURL(url); resolve(file); };
-    img.src = url;
-  });
-}
-async function saveDraft() {
-  const myGen = _draftGeneration;
-  try {
-    const meta = {
-      lang: state.lang, format: state.format, template: state.template, bg: state.bg,
-      smartCrop: state.smartCrop, filter: state.filter, category: state.category, styleCustomized: state._styleCustomized,
-      brand: { name: state.brand.name, site: state.brand.site, sub: state.brand.sub, phone: state.brand.phone,
-                accent: state.brand.accent, showWatermark: state.brand.showWatermark, langs: [...state.brand.langs] },
-      content: { title: state.title, price: state.price, loc: state.loc, badge: state.badge, spec: state.spec,
-                 energyRating: state.energyRating, starRating: state.starRating, allergens: state.allergens, sizes: state.sizes,
-                 financeMonths: state.financeMonths, financeDownPct: state.financeDownPct, financeAPR: state.financeAPR,
-                 cropAdjust: state.cropAdjust },
-      caption: document.getElementById('caption') ? document.getElementById('caption').value : ''
-    };
-    if (myGen !== _draftGeneration) return; // uma limpeza aconteceu entretanto
-    await idbSet('meta', meta);
-    const files = state.photoFiles || [];
-    if (files.length) {
-      const compressed = await Promise.all(files.map(f => compressImageFile(f, 1600, 0.82)));
-      if (myGen !== _draftGeneration) return; // idem — não voltar a escrever por cima de uma limpeza
-      await idbSet('photos', compressed);
-    } else if (myGen === _draftGeneration) {
-      await idbDelete('photos');
-    }
-    if (state._customLogoFile && myGen === _draftGeneration) await idbSet('logo', state._customLogoFile);
-  } catch (e) { console.warn('Não foi possível guardar o rascunho local:', e); }
-}
-async function loadDraftIfAny() {
-  try {
-    const meta = await idbGet('meta');
-    if (!meta) return;
-    if (meta.brand) {
-      Object.assign(state.brand, meta.brand, { langs: new Set(meta.brand.langs && meta.brand.langs.length ? meta.brand.langs : ['pt', 'en']) });
-      document.getElementById('brandName').value = state.brand.name || '';
-      document.getElementById('brandSite').value = state.brand.site || '';
-      document.getElementById('brandSub').value = state.brand.sub || '';
-      document.getElementById('brandPhone').value = state.brand.phone || '';
-      document.getElementById('brandColor').value = state.brand.accent || '#B8935A';
-      document.getElementById('brandWatermark').checked = state.brand.showWatermark !== false;
-      setGoldVar(state.brand.accent || '#B8935A');
-      document.querySelectorAll('#langsSeg button').forEach(b => b.classList.toggle('active', state.brand.langs.has(b.dataset.l)));
-    }
-    state.lang = meta.lang || state.lang;
-    document.querySelectorAll('#langSwitch button').forEach(b => b.classList.toggle('active', b.dataset.lang === state.lang));
-    applyUIStrings(); // se o rascunho trouxer outro idioma, a interface já arranca traduzida
-    state.smartCrop = meta.smartCrop !== false;
-    state.filter = meta.filter || 'auto';
-    state.category = meta.category || 'generico';
-    state._styleCustomized = !!meta.styleCustomized;
-    document.getElementById('fSmartCrop').checked = state.smartCrop;
-    document.getElementById('fFilter').value = state.filter;
-    if (meta.content) {
-      state.title = meta.content.title || ''; state.price = meta.content.price || '';
-      state.loc = meta.content.loc || ''; state.badge = meta.content.badge || '';
-      state.spec = meta.content.spec || [{label:'',value:''},{label:'',value:''},{label:'',value:''},{label:'',value:''}];
-      state.energyRating = meta.content.energyRating || ''; state.starRating = meta.content.starRating || 0;
-      state.allergens = meta.content.allergens || []; state.sizes = meta.content.sizes || [];
-      state.financeMonths = meta.content.financeMonths || 60; state.financeDownPct = meta.content.financeDownPct ?? 20;
-      state.financeAPR = meta.content.financeAPR ?? 7.9;
-      state.cropAdjust = meta.content.cropAdjust || {};
-    }
-    const photos = await idbGet('photos');
-    if (photos && photos.length) {
-      state.photoFiles = photos;
-      state.photos = photos.map(f => URL.createObjectURL(f));
-      state.carPhotos = state.photos.slice(0, 10);
-      state.photo = state.photos[0];
-    }
-    const logoBlob = await idbGet('logo');
-    if (logoBlob) {
-      state._customLogoFile = logoBlob;
-      const url = URL.createObjectURL(logoBlob);
-      state.brand.logoUrl = url;
-      // idem: não mexe no #headerLogo — esse é sempre o logótipo ZOS da app
-    }
-    if (meta.format) state.format = meta.format;
-    if (meta.template) state.template = meta.template;
-    if (meta.bg) state.bg = meta.bg;
-    setFormat(state.format); setTemplate(state.template); setBg(state.bg);
-    const hint = document.getElementById('draftHintText');
-    if (photos && photos.length && hint) hint.textContent = '📂 Rascunho anterior recuperado (' + photos.length + ' foto(s))';
-  } catch (e) { console.warn('Sem rascunho anterior ou erro ao recuperar:', e); }
-}
-
-// ═══════════════════════════════════════════════════════════════
-//  DESFAZER / REFAZER — histórico leve dos campos de texto (título,
-//  preço, localização, selo, legenda). Ctrl/Cmd+Z e Ctrl/Cmd+Shift+Z.
-// ═══════════════════════════════════════════════════════════════
-let historyStack = [], historyIndex = -1, _histTimer = null;
-function pushHistory() {
-  clearTimeout(_histTimer);
-  _histTimer = setTimeout(() => {
-    const captionEl = document.getElementById('caption');
-    const snap = { title: state.title, price: state.price, loc: state.loc, badge: state.badge,
-                    caption: captionEl ? captionEl.value : '' };
-    const last = historyStack[historyIndex];
-    if (last && JSON.stringify(last) === JSON.stringify(snap)) return;
-    historyStack = historyStack.slice(0, historyIndex + 1);
-    historyStack.push(snap);
-    if (historyStack.length > 50) historyStack.shift();
-    historyIndex = historyStack.length - 1;
-  }, 500);
-}
-function applyHistorySnap(snap) {
-  if (!snap) return;
-  state.title = snap.title; state.price = snap.price; state.loc = snap.loc; state.badge = snap.badge;
-  const fTitle = document.getElementById('fTitle'), fPrice = document.getElementById('fPrice'),
-        fLoc = document.getElementById('fLoc'), fBadge = document.getElementById('fBadge'), cap = document.getElementById('caption');
-  if (fTitle) fTitle.value = snap.title; if (fPrice) fPrice.value = snap.price;
-  if (fLoc) fLoc.value = snap.loc; if (fBadge) fBadge.value = snap.badge;
-  if (cap) cap.value = snap.caption;
-  draw();
-}
-function undoEdit() { if (historyIndex > 0) { historyIndex--; applyHistorySnap(historyStack[historyIndex]); } }
-function redoEdit() { if (historyIndex < historyStack.length - 1) { historyIndex++; applyHistorySnap(historyStack[historyIndex]); } }
-document.addEventListener('keydown', (e) => {
-  const mod = e.ctrlKey || e.metaKey;
-  if (!mod || e.key.toLowerCase() !== 'z') return;
-  e.preventDefault();
-  if (e.shiftKey) redoEdit(); else undoEdit();
-});
-
-// ═══════════════════════════════════════════════════════════════
-//  KITS DE MARCA — perfis guardados (nome, cores, site, idiomas…)
-//  para quem gere várias marcas/agentes na mesma app.
-// ═══════════════════════════════════════════════════════════════
-async function refreshBrandKitSelect() {
-  const sel = document.getElementById('brandKitSelect');
-  if (!sel) return;
-  const kits = (await idbGet('kits').catch(() => null)) || {};
-  const cur = sel.value;
-  // Usa APIs DOM seguras (createElement + textContent), não innerHTML —
-  // o nome do kit é texto escrito livremente pela pessoa (via prompt()) e
-  // nunca deve ser interpretado como HTML. Vulnerabilidade XSS real,
-  // confirmada e corrigida numa auditoria de segurança.
-  sel.innerHTML = '';
-  const noneOpt = document.createElement('option');
-  noneOpt.value = ''; noneOpt.textContent = '— nenhum —';
-  sel.appendChild(noneOpt);
-  Object.keys(kits).forEach(n => {
-    const opt = document.createElement('option');
-    opt.value = n; opt.textContent = n;
-    sel.appendChild(opt);
-  });
-  if (kits[cur]) sel.value = cur;
-}
-async function saveBrandKit() {
-  const name = prompt('Nome para este kit de marca (ex.: "Loja Sunset — Calçado"):');
-  if (!name) return;
-  const kits = (await idbGet('kits').catch(() => null)) || {};
-  kits[name] = { name: state.brand.name, site: state.brand.site, sub: state.brand.sub, phone: state.brand.phone,
-                 accent: state.brand.accent, showWatermark: state.brand.showWatermark, langs: [...state.brand.langs],
-                 category: state.category, spec: state.spec.map(s => ({ label: s.label, value: '' })) };
-  await idbSet('kits', kits);
-  await refreshBrandKitSelect();
-  document.getElementById('brandKitSelect').value = name;
-  toast('Kit "' + name + '" guardado');
-}
-async function applyBrandKit(name) {
-  if (!name) return;
-  const kits = (await idbGet('kits').catch(() => null)) || {};
-  const k = kits[name]; if (!k) return;
-  Object.assign(state.brand, k, { langs: new Set(k.langs && k.langs.length ? k.langs : ['pt', 'en']) });
-  document.getElementById('brandName').value = state.brand.name || '';
-  document.getElementById('brandSite').value = state.brand.site || '';
-  document.getElementById('brandSub').value = state.brand.sub || '';
-  document.getElementById('brandPhone').value = state.brand.phone || '';
-  document.getElementById('brandColor').value = state.brand.accent || '#B8935A';
-  document.getElementById('brandWatermark').checked = state.brand.showWatermark !== false;
-  setGoldVar(state.brand.accent || '#B8935A');
-  document.querySelectorAll('#langsSeg button').forEach(b => b.classList.toggle('active', state.brand.langs.has(b.dataset.l)));
-  renderLangSwitch();
-  // um kit também guarda a categoria/ficha típica deste negócio (só os rótulos, não valores antigos)
-  if (k.category && k.spec) {
-    state.category = k.category;
-    document.getElementById('fCategory').value = k.category;
-    k.spec.forEach((s, i) => {
-      if (!state.spec[i]) return;
-      state.spec[i].label = s.label || '';
-      const lblEl = document.getElementById('specLabel' + i);
-      if (lblEl) lblEl.value = s.label || '';
-    });
-  }
-  draw();
-  scheduleSaveDraft();
-  toast('Kit "' + name + '" aplicado');
-}
-async function deleteBrandKit() {
-  const sel = document.getElementById('brandKitSelect');
-  const name = sel.value; if (!name) return;
-  if (!confirm('Apagar o kit "' + name + '"?')) return;
-  const kits = (await idbGet('kits').catch(() => null)) || {};
-  delete kits[name];
-  await idbSet('kits', kits);
-  await refreshBrandKitSelect();
-  toast('Kit apagado');
-}
+// src/data/i18n.js — Traduções.
+//
+// Dois sistemas distintos, por razão histórica que se manteve por ser correta:
+// I18N traduz o CONTEÚDO desenhado nos posts gerados (canvas); UI_STRINGS
+// traduz a INTERFACE da própria app (barra lateral, botões, etiquetas).
+// Extraído de app/my-studio.html — Phase 2 da auditoria de estabilização.
+// Não editar app/my-studio.html diretamente na secção destas constantes;
+// esse ficheiro passa a ser gerado por scripts/build.js a partir daqui.
 
 const I18N = {
   pt: { cta:'📩 Fale connosco — link na bio', swipe:'desliza  →',
@@ -790,14 +497,6 @@ const I18N = {
         collageHint:'Seleziona almeno 2 foto con il cerchio ✓ nella griglia per usare il Collage',
         before:'Prima', after:'Dopo', beforeAfterHint:'Seleziona 2 foto con il cerchio ✓ — la prima è il "prima", la seconda il "dopo"', energyClassLabel:'Classe', sizesLabel:'Taglia' }
 };
-
-// ═══════════════════════════════════════════════════════════════
-//  TEXTOS DA INTERFACE — traduzidos nos 6 idiomas suportados.
-//  Diferente do I18N (que traduz o CONTEÚDO gerado — posts, legendas),
-//  isto traduz a própria interface de edição. Aplicado por applyUIStrings()
-//  sempre que o idioma ativo muda — a app deixa de "falar só português"
-//  para quem trabalha noutra língua.
-// ═══════════════════════════════════════════════════════════════
 const UI_STRINGS = {
   pt: {
     brandStepLabel: '⚙ Marca & Idiomas',
@@ -1369,6 +1068,514 @@ const UI_STRINGS = {
     cropZoomLabel: 'Zoom', cropPanXLabel: 'Posizione orizzontale', cropPanYLabel: 'Posizione verticale'
   }
 };
+
+// src/data/categories.js — Categorias: rótulos de ficha, paletas sugeridas,
+// selos rápidos, e os campos extra (certificado energético, alergénios,
+// tamanhos). Extraído de app/my-studio.html — Phase 2 da auditoria.
+
+const ENERGY_LEVELS = ['A+', 'A', 'B', 'C', 'D', 'E', 'F'];
+const ENERGY_EMOJI = { 'A+':'🟢', 'A':'🟢', 'B':'🟢', 'C':'🟡', 'D':'🟡', 'E':'🟠', 'F':'🔴' };
+const SIZE_LIST = ['XS', 'S', 'M', 'L', 'XL', 'XXL'];
+const ALLERGEN_KEYS = ['gluten', 'lactose', 'ovos', 'frutosSecos', 'marisco', 'peixe', 'soja', 'mostarda'];
+const ALLERGEN_ICONS = { gluten:'🌾', lactose:'🥛', ovos:'🥚', frutosSecos:'🥜', marisco:'🦐', peixe:'🐟', soja:'🫘', mostarda:'🌭' };
+const ALLERGEN_NAMES = {
+  pt: { gluten:'Glúten', lactose:'Lactose', ovos:'Ovos', frutosSecos:'Frutos secos', marisco:'Marisco', peixe:'Peixe', soja:'Soja', mostarda:'Mostarda' },
+  en: { gluten:'Gluten', lactose:'Dairy', ovos:'Eggs', frutosSecos:'Nuts', marisco:'Shellfish', peixe:'Fish', soja:'Soy', mostarda:'Mustard' },
+  fr: { gluten:'Gluten', lactose:'Lactose', ovos:'Œufs', frutosSecos:'Fruits à coque', marisco:'Crustacés', peixe:'Poisson', soja:'Soja', mostarda:'Moutarde' },
+  es: { gluten:'Gluten', lactose:'Lactosa', ovos:'Huevos', frutosSecos:'Frutos secos', marisco:'Marisco', peixe:'Pescado', soja:'Soja', mostarda:'Mostaza' },
+  de: { gluten:'Gluten', lactose:'Laktose', ovos:'Eier', frutosSecos:'Nüsse', marisco:'Krebstiere', peixe:'Fisch', soja:'Soja', mostarda:'Senf' },
+  it: { gluten:'Glutine', lactose:'Lattosio', ovos:'Uova', frutosSecos:'Frutta a guscio', marisco:'Crostacei', peixe:'Pesce', soja:'Soia', mostarda:'Senape' }
+};
+function specsLine() {
+  const parts = (state.spec || []).filter(s => s.value).map(s => (s.label ? s.label + ': ' : '') + s.value);
+  const t = I18N[state.lang] || I18N.pt;
+  if (state.category === 'imoveis' && state.energyRating) {
+    parts.push((ENERGY_EMOJI[state.energyRating] || '') + ' ' + t.energyClassLabel + ' ' + state.energyRating);
+  }
+  if (state.category === 'viagens' && state.starRating > 0) {
+    parts.push('★'.repeat(state.starRating) + '☆'.repeat(5 - state.starRating));
+  }
+  if (state.category === 'gastronomia' && state.allergens.length) {
+    parts.push(state.allergens.map(a => ALLERGEN_ICONS[a] || '').join(' '));
+  }
+  if (state.category === 'moda' && state.sizes.length) {
+    parts.push(t.sizesLabel + ' ' + state.sizes.join('/'));
+  }
+  return parts.join('   ·   ');
+}
+function onSpecChange(idx, value) {
+  state.spec[idx].value = value;
+  if (idx === 0) renderCategoryExtras(); // área interior é o campo 0 — recalcula €/m² ao vivo
+  draw();
+  scheduleSaveDraft();
+}
+function onSpecLabelChange(idx, value) {
+  state.spec[idx].label = value;
+  draw();
+  scheduleSaveDraft();
+}
+// Presets por idioma — a categoria escolhida preenche os rótulos na língua ativa,
+// mas continuam 100% editáveis. Trocar o idioma da interface depois de escolher a
+// categoria não reescreve o que já foi personalizado (só uma nova escolha o faz).
+const CATEGORY_PRESETS = {
+  pt: {
+    generico:  ['Característica 1', 'Característica 2', 'Característica 3', 'Característica 4'],
+    imoveis:   ['Área interior (m²)', 'Quartos', 'Área exterior (m²)', 'Lugares de garagem'],
+    carros:    ['Marca / Modelo', 'Ano', 'Quilómetros', 'Combustível'],
+    viagens:   ['Destino', 'Duração', 'Datas', 'Regime'],
+    moda:      ['Tamanho', 'Cor', 'Material', 'Marca'],
+    cosmetica: ['Tipo / Uso', 'Volume', 'Ingrediente-chave', 'Marca'],
+    casa:      ['Tipo de peça', 'Material', 'Dimensões', 'Marca'],
+    gastronomia: ['Tipo de cozinha', 'Porção', 'Ingredientes-chave', 'Restrições']
+  },
+  en: {
+    generico:  ['Feature 1', 'Feature 2', 'Feature 3', 'Feature 4'],
+    imoveis:   ['Interior area (m²)', 'Bedrooms', 'Outdoor area (m²)', 'Parking spaces'],
+    carros:    ['Make / Model', 'Year', 'Mileage', 'Fuel type'],
+    viagens:   ['Destination', 'Duration', 'Dates', 'Board basis'],
+    moda:      ['Size', 'Colour', 'Material', 'Brand'],
+    cosmetica: ['Type / Use', 'Volume', 'Key ingredient', 'Brand'],
+    casa:      ['Item type', 'Material', 'Dimensions', 'Brand'],
+    gastronomia: ['Cuisine type', 'Serves', 'Key ingredients', 'Dietary info']
+  },
+  fr: {
+    generico:  ['Caractéristique 1', 'Caractéristique 2', 'Caractéristique 3', 'Caractéristique 4'],
+    imoveis:   ['Surface intérieure (m²)', 'Chambres', 'Surface extérieure (m²)', 'Places de parking'],
+    carros:    ['Marque / Modèle', 'Année', 'Kilométrage', 'Carburant'],
+    viagens:   ['Destination', 'Durée', 'Dates', 'Formule'],
+    moda:      ['Taille', 'Couleur', 'Matière', 'Marque'],
+    cosmetica: ['Type / Usage', 'Volume', 'Ingrédient clé', 'Marque'],
+    casa:      ['Type de pièce', 'Matière', 'Dimensions', 'Marque'],
+    gastronomia: ['Type de cuisine', 'Portion', 'Ingrédients clés', 'Régimes spéciaux']
+  },
+  es: {
+    generico:  ['Característica 1', 'Característica 2', 'Característica 3', 'Característica 4'],
+    imoveis:   ['Superficie interior (m²)', 'Habitaciones', 'Superficie exterior (m²)', 'Plazas de garaje'],
+    carros:    ['Marca / Modelo', 'Año', 'Kilómetros', 'Combustible'],
+    viagens:   ['Destino', 'Duración', 'Fechas', 'Régimen'],
+    moda:      ['Talla', 'Color', 'Material', 'Marca'],
+    cosmetica: ['Tipo / Uso', 'Volumen', 'Ingrediente clave', 'Marca'],
+    casa:      ['Tipo de pieza', 'Material', 'Dimensiones', 'Marca'],
+    gastronomia: ['Tipo de cocina', 'Ración', 'Ingredientes clave', 'Información dietética']
+  },
+  de: {
+    generico:  ['Merkmal 1', 'Merkmal 2', 'Merkmal 3', 'Merkmal 4'],
+    imoveis:   ['Wohnfläche (m²)', 'Zimmer', 'Außenfläche (m²)', 'Stellplätze'],
+    carros:    ['Marke / Modell', 'Baujahr', 'Kilometerstand', 'Kraftstoff'],
+    viagens:   ['Reiseziel', 'Dauer', 'Termine', 'Verpflegung'],
+    moda:      ['Größe', 'Farbe', 'Material', 'Marke'],
+    cosmetica: ['Typ / Anwendung', 'Volumen', 'Hauptinhaltsstoff', 'Marke'],
+    casa:      ['Art des Stücks', 'Material', 'Maße', 'Marke'],
+    gastronomia: ['Küchenstil', 'Portion', 'Hauptzutaten', 'Ernährungshinweise']
+  },
+  it: {
+    generico:  ['Caratteristica 1', 'Caratteristica 2', 'Caratteristica 3', 'Caratteristica 4'],
+    imoveis:   ['Superficie interna (m²)', 'Camere', 'Superficie esterna (m²)', 'Posti auto'],
+    carros:    ['Marca / Modello', 'Anno', 'Chilometraggio', 'Alimentazione'],
+    viagens:   ['Destinazione', 'Durata', 'Date', 'Trattamento'],
+    moda:      ['Taglia', 'Colore', 'Materiale', 'Marca'],
+    cosmetica: ['Tipo / Uso', 'Volume', 'Ingrediente chiave', 'Marca'],
+    casa:      ['Tipo di pezzo', 'Materiale', 'Dimensioni', 'Marca'],
+    gastronomia: ['Tipo di cucina', 'Porzione', 'Ingredienti chiave', 'Info alimentari']
+  }
+};
+// Paleta sugerida por categoria — poupa o clique de escolher cor à mão.
+// Só se aplica enquanto a pessoa não tiver personalizado a cor/fundo ela
+// própria (ver state._styleCustomized) — a automação nunca pisa uma escolha
+// manual já feita.
+const CATEGORY_PALETTES = {
+  generico:    { accent: '#B8935A', bg: 'dark'  },
+  imoveis:     { accent: '#B8935A', bg: 'dark'  },
+  carros:      { accent: '#6B8CAE', bg: 'dark'  },
+  viagens:     { accent: '#D97A4D', bg: 'grad'  },
+  moda:        { accent: '#A67C87', bg: 'light' },
+  cosmetica:   { accent: '#C98BA0', bg: 'light' },
+  casa:        { accent: '#7A8B5E', bg: 'light' },
+  gastronomia: { accent: '#B5502E', bg: 'dark'  }
+};
+// Selos sugeridos por categoria — um clique preenche o campo "Selo", em vez de
+// escrever de raiz. Continua 100% editável a seguir.
+const CATEGORY_BADGES = {
+  pt: {
+    generico:    ['Novo', 'Promoção', 'Exclusivo', 'Limitado'],
+    imoveis:     ['Novo no Mercado', 'Reservado', 'Venda Urgente', 'Oportunidade'],
+    carros:      ['Garantia Incluída', 'Único Dono', 'Sem Acidentes', 'Revisões em Dia'],
+    viagens:     ['Últimas Vagas', 'Oferta Especial', 'Só Este Mês', 'Lotação Limitada'],
+    moda:        ['Novo', 'Saldo', 'Edição Limitada', 'Últimas Peças'],
+    cosmetica:   ['Novo', 'Mais Vendido', 'Edição Limitada', 'Promoção'],
+    casa:        ['Novo', 'Peça Única', 'Em Stock', 'Promoção'],
+    gastronomia: ['Prato do Dia', 'Novo no Menu', 'Edição Especial', 'Só Hoje']
+  },
+  en: {
+    generico:    ['New', 'Sale', 'Exclusive', 'Limited'],
+    imoveis:     ['New Listing', 'Under Offer', 'Quick Sale', 'Great Opportunity'],
+    carros:      ['Warranty Included', 'One Owner', 'Accident-Free', 'Full Service History'],
+    viagens:     ['Last Spots', 'Special Offer', 'This Month Only', 'Limited Availability'],
+    moda:        ['New', 'Sale', 'Limited Edition', 'Last Pieces'],
+    cosmetica:   ['New', 'Best Seller', 'Limited Edition', 'Sale'],
+    casa:        ['New', 'One of a Kind', 'In Stock', 'Sale'],
+    gastronomia: ['Dish of the Day', 'New on the Menu', 'Special Edition', 'Today Only']
+  },
+  fr: {
+    generico:    ['Nouveau', 'Promotion', 'Exclusif', 'Édition limitée'],
+    imoveis:     ['Nouveau sur le marché', 'Sous offre', 'Vente urgente', 'Belle opportunité'],
+    carros:      ['Garantie incluse', 'Un seul propriétaire', 'Sans accident', 'Entretien à jour'],
+    viagens:     ['Dernières places', 'Offre spéciale', 'Ce mois-ci seulement', 'Places limitées'],
+    moda:        ['Nouveau', 'Soldes', 'Édition limitée', 'Dernières pièces'],
+    cosmetica:   ['Nouveau', 'Meilleure vente', 'Édition limitée', 'Promotion'],
+    casa:        ['Nouveau', 'Pièce unique', 'En stock', 'Promotion'],
+    gastronomia: ['Plat du jour', 'Nouveau au menu', 'Édition spéciale', 'Aujourd\u2019hui seulement']
+  },
+  es: {
+    generico:    ['Nuevo', 'Oferta', 'Exclusivo', 'Edición limitada'],
+    imoveis:     ['Nuevo en el mercado', 'Reservado', 'Venta urgente', 'Gran oportunidad'],
+    carros:      ['Garantía incluida', 'Único dueño', 'Sin accidentes', 'Revisiones al día'],
+    viagens:     ['Últimas plazas', 'Oferta especial', 'Solo este mes', 'Plazas limitadas'],
+    moda:        ['Nuevo', 'Rebajas', 'Edición limitada', 'Últimas piezas'],
+    cosmetica:   ['Nuevo', 'Más vendido', 'Edición limitada', 'Oferta'],
+    casa:        ['Nuevo', 'Pieza única', 'En stock', 'Oferta'],
+    gastronomia: ['Plato del día', 'Nuevo en el menú', 'Edición especial', 'Solo hoy']
+  },
+  de: {
+    generico:    ['Neu', 'Angebot', 'Exklusiv', 'Limitiert'],
+    imoveis:     ['Neu auf dem Markt', 'Reserviert', 'Dringender Verkauf', 'Tolle Gelegenheit'],
+    carros:      ['Garantie inklusive', 'Einzelbesitzer', 'Unfallfrei', 'Scheckheftgepflegt'],
+    viagens:     ['Letzte Plätze', 'Sonderangebot', 'Nur diesen Monat', 'Begrenzte Plätze'],
+    moda:        ['Neu', 'Sale', 'Limitierte Auflage', 'Letzte Stücke'],
+    cosmetica:   ['Neu', 'Bestseller', 'Limitierte Auflage', 'Angebot'],
+    casa:        ['Neu', 'Unikat', 'Auf Lager', 'Angebot'],
+    gastronomia: ['Tagesgericht', 'Neu auf der Karte', 'Sonderedition', 'Nur heute']
+  },
+  it: {
+    generico:    ['Nuovo', 'Promozione', 'Esclusivo', 'Edizione limitata'],
+    imoveis:     ['Nuovo sul mercato', 'Riservato', 'Vendita urgente', 'Ottima occasione'],
+    carros:      ['Garanzia inclusa', 'Unico proprietario', 'Senza incidenti', 'Tagliandi in regola'],
+    viagens:     ['Ultimi posti', 'Offerta speciale', 'Solo questo mese', 'Posti limitati'],
+    moda:        ['Nuovo', 'Saldi', 'Edizione limitata', 'Ultimi pezzi'],
+    cosmetica:   ['Nuovo', 'Più venduto', 'Edizione limitata', 'Promozione'],
+    casa:        ['Nuovo', 'Pezzo unico', 'Disponibile', 'Promozione'],
+    gastronomia: ['Piatto del giorno', 'Novità nel menu', 'Edizione speciale', 'Solo oggi']
+  }
+};
+
+// src/main.js — estado, rendering (canvas), UI, exportações, IndexedDB.
+// Depende de src/data/i18n.js e src/data/categories.js (concatenados antes
+// deste ficheiro pelo scripts/build.js — precisam de estar definidos
+// primeiro, já que main.js lê I18N/UI_STRINGS/CATEGORY_* diretamente).
+// Extraído de app/my-studio.html — Phase 2 da auditoria de estabilização.
+
+// ═══ ESTADO ═══
+const FORMATS = { feed45: [1080, 1350], square: [1080, 1080], story: [1080, 1920], wide: [1920, 1080], pin: [1000, 1500] };
+const state = {
+  lang: 'pt', source: 'upload', format: 'feed45', template: 'classico',
+  photo: null, img: null,
+  title: '', price: '', loc: '', badge: '', showSpecs: true, bg: 'dark',
+  photos: [], carPhotos: [], photoFiles: [],
+  slides: [], slideIdx: 0,
+  // recorte inteligente + filtro de imagem (nome do preset em PHOTO_FILTERS)
+  smartCrop: true, filter: 'auto',
+  cropAdjust: {}, // { [urlDaFoto]: {panX, panY, zoom} } — ajuste manual de enquadramento, por foto
+  // categoria + ficha de produto — universal: imóveis, carros, viagens, cosmética,
+  // roupa, sapatos, ou qualquer outra coisa. Rótulos e valores totalmente editáveis.
+  category: 'generico',
+  _styleCustomized: false, // true assim que a pessoa escolhe cor/fundo à mão — a partir daí a categoria deixa de sugerir automaticamente
+  // campos extra específicos de certas categorias — só aparecem/contam quando
+  // a categoria ativa os usa (ver renderCategoryExtras)
+  energyRating: '', starRating: 0, allergens: [], sizes: [],
+  financeMonths: 60, financeDownPct: 20, financeAPR: 7.9,
+  spec: [ { label: '', value: '' }, { label: '', value: '' }, { label: '', value: '' }, { label: '', value: '' } ],
+  // marca — nome, cor, site, com ou sem marca de água
+  brand: { name: 'My Studio', site: '', sub: '', phone: '', accent: '#B8935A',
+           showWatermark: true, logoUrl: null, langs: new Set(['pt', 'en']) }
+};
+
+// ═══════════════════════════════════════════════════════════════
+//  RASCUNHO LOCAL (IndexedDB) — guarda automaticamente as fotos
+//  carregadas, textos e marca no browser, para não se perder nada
+//  se a página for fechada ou recarregada por acidente. Fica só
+//  neste dispositivo — nunca é enviado para lado nenhum.
+// ═══════════════════════════════════════════════════════════════
+const DRAFT_DB = 'zstudio-draft', DRAFT_STORE = 'kv';
+function idbOpen() {
+  return new Promise((resolve, reject) => {
+    if (!window.indexedDB) { reject(new Error('IndexedDB indisponível')); return; }
+    const req = indexedDB.open(DRAFT_DB, 1);
+    req.onupgradeneeded = () => req.result.createObjectStore(DRAFT_STORE);
+    req.onsuccess = () => resolve(req.result);
+    req.onerror = () => reject(req.error);
+  });
+}
+async function idbSet(key, value) {
+  const db = await idbOpen();
+  return new Promise((resolve, reject) => {
+    const tx = db.transaction(DRAFT_STORE, 'readwrite');
+    tx.objectStore(DRAFT_STORE).put(value, key);
+    tx.oncomplete = () => resolve();
+    tx.onerror = () => reject(tx.error);
+  });
+}
+async function idbGet(key) {
+  const db = await idbOpen();
+  return new Promise((resolve, reject) => {
+    const tx = db.transaction(DRAFT_STORE, 'readonly');
+    const req = tx.objectStore(DRAFT_STORE).get(key);
+    req.onsuccess = () => resolve(req.result);
+    req.onerror = () => reject(req.error);
+  });
+}
+async function idbDelete(key) {
+  const db = await idbOpen();
+  return new Promise((resolve, reject) => {
+    const tx = db.transaction(DRAFT_STORE, 'readwrite');
+    tx.objectStore(DRAFT_STORE).delete(key);
+    tx.oncomplete = () => resolve();
+    tx.onerror = () => reject(tx.error);
+  });
+}
+
+let _saveDraftTimer = null;
+// Contador de geração: uma limpeza de rascunho incrementa isto, para que uma
+// gravação automática que já estava "em voo" (ex.: a meio da compressão de uma
+// foto) não ressuscite dados que acabaram de ser apagados.
+let _draftGeneration = 0;
+function scheduleSaveDraft() {
+  clearTimeout(_saveDraftTimer);
+  _saveDraftTimer = setTimeout(saveDraft, 900);
+}
+// Reduz o tamanho das fotos antes de as guardar localmente — sem isto, fotos de
+// telemóvel em alta resolução esgotam depressa o espaço do browser. A foto original
+// usada na edição/exportação nunca é tocada, isto é só para a cópia do rascunho.
+const compressedCache = new WeakMap();
+function compressImageFile(file, maxDim, quality) {
+  if (compressedCache.has(file)) return Promise.resolve(compressedCache.get(file));
+  return new Promise((resolve) => {
+    const img = new Image();
+    const url = URL.createObjectURL(file);
+    img.onload = () => {
+      let { width, height } = img;
+      const scale = Math.min(1, maxDim / Math.max(width, height));
+      width = Math.max(1, Math.round(width * scale)); height = Math.max(1, Math.round(height * scale));
+      const c = document.createElement('canvas'); c.width = width; c.height = height;
+      c.getContext('2d').drawImage(img, 0, 0, width, height);
+      c.toBlob(blob => {
+        URL.revokeObjectURL(url);
+        const result = blob || file;
+        compressedCache.set(file, result);
+        resolve(result);
+      }, 'image/jpeg', quality);
+    };
+    img.onerror = () => { URL.revokeObjectURL(url); resolve(file); };
+    img.src = url;
+  });
+}
+async function saveDraft() {
+  const myGen = _draftGeneration;
+  try {
+    const meta = {
+      lang: state.lang, format: state.format, template: state.template, bg: state.bg,
+      smartCrop: state.smartCrop, filter: state.filter, category: state.category, styleCustomized: state._styleCustomized,
+      brand: { name: state.brand.name, site: state.brand.site, sub: state.brand.sub, phone: state.brand.phone,
+                accent: state.brand.accent, showWatermark: state.brand.showWatermark, langs: [...state.brand.langs] },
+      content: { title: state.title, price: state.price, loc: state.loc, badge: state.badge, spec: state.spec,
+                 energyRating: state.energyRating, starRating: state.starRating, allergens: state.allergens, sizes: state.sizes,
+                 financeMonths: state.financeMonths, financeDownPct: state.financeDownPct, financeAPR: state.financeAPR,
+                 cropAdjust: state.cropAdjust },
+      caption: document.getElementById('caption') ? document.getElementById('caption').value : ''
+    };
+    if (myGen !== _draftGeneration) return; // uma limpeza aconteceu entretanto
+    await idbSet('meta', meta);
+    const files = state.photoFiles || [];
+    if (files.length) {
+      const compressed = await Promise.all(files.map(f => compressImageFile(f, 1600, 0.82)));
+      if (myGen !== _draftGeneration) return; // idem — não voltar a escrever por cima de uma limpeza
+      await idbSet('photos', compressed);
+    } else if (myGen === _draftGeneration) {
+      await idbDelete('photos');
+    }
+    if (state._customLogoFile && myGen === _draftGeneration) await idbSet('logo', state._customLogoFile);
+  } catch (e) { console.warn('Não foi possível guardar o rascunho local:', e); }
+}
+async function loadDraftIfAny() {
+  try {
+    const meta = await idbGet('meta');
+    if (!meta) return;
+    if (meta.brand) {
+      Object.assign(state.brand, meta.brand, { langs: new Set(meta.brand.langs && meta.brand.langs.length ? meta.brand.langs : ['pt', 'en']) });
+      document.getElementById('brandName').value = state.brand.name || '';
+      document.getElementById('brandSite').value = state.brand.site || '';
+      document.getElementById('brandSub').value = state.brand.sub || '';
+      document.getElementById('brandPhone').value = state.brand.phone || '';
+      document.getElementById('brandColor').value = state.brand.accent || '#B8935A';
+      document.getElementById('brandWatermark').checked = state.brand.showWatermark !== false;
+      setGoldVar(state.brand.accent || '#B8935A');
+      document.querySelectorAll('#langsSeg button').forEach(b => b.classList.toggle('active', state.brand.langs.has(b.dataset.l)));
+    }
+    state.lang = meta.lang || state.lang;
+    document.querySelectorAll('#langSwitch button').forEach(b => b.classList.toggle('active', b.dataset.lang === state.lang));
+    applyUIStrings(); // se o rascunho trouxer outro idioma, a interface já arranca traduzida
+    state.smartCrop = meta.smartCrop !== false;
+    state.filter = meta.filter || 'auto';
+    state.category = meta.category || 'generico';
+    state._styleCustomized = !!meta.styleCustomized;
+    document.getElementById('fSmartCrop').checked = state.smartCrop;
+    document.getElementById('fFilter').value = state.filter;
+    if (meta.content) {
+      state.title = meta.content.title || ''; state.price = meta.content.price || '';
+      state.loc = meta.content.loc || ''; state.badge = meta.content.badge || '';
+      state.spec = meta.content.spec || [{label:'',value:''},{label:'',value:''},{label:'',value:''},{label:'',value:''}];
+      state.energyRating = meta.content.energyRating || ''; state.starRating = meta.content.starRating || 0;
+      state.allergens = meta.content.allergens || []; state.sizes = meta.content.sizes || [];
+      state.financeMonths = meta.content.financeMonths || 60; state.financeDownPct = meta.content.financeDownPct ?? 20;
+      state.financeAPR = meta.content.financeAPR ?? 7.9;
+      state.cropAdjust = meta.content.cropAdjust || {};
+    }
+    const photos = await idbGet('photos');
+    if (photos && photos.length) {
+      state.photoFiles = photos;
+      state.photos = photos.map(f => URL.createObjectURL(f));
+      state.carPhotos = state.photos.slice(0, 10);
+      state.photo = state.photos[0];
+    }
+    const logoBlob = await idbGet('logo');
+    if (logoBlob) {
+      state._customLogoFile = logoBlob;
+      const url = URL.createObjectURL(logoBlob);
+      state.brand.logoUrl = url;
+      // idem: não mexe no #headerLogo — esse é sempre o logótipo ZOS da app
+    }
+    if (meta.format) state.format = meta.format;
+    if (meta.template) state.template = meta.template;
+    if (meta.bg) state.bg = meta.bg;
+    setFormat(state.format); setTemplate(state.template); setBg(state.bg);
+    const hint = document.getElementById('draftHintText');
+    if (photos && photos.length && hint) hint.textContent = '📂 Rascunho anterior recuperado (' + photos.length + ' foto(s))';
+  } catch (e) { console.warn('Sem rascunho anterior ou erro ao recuperar:', e); }
+}
+
+// ═══════════════════════════════════════════════════════════════
+//  DESFAZER / REFAZER — histórico leve dos campos de texto (título,
+//  preço, localização, selo, legenda). Ctrl/Cmd+Z e Ctrl/Cmd+Shift+Z.
+// ═══════════════════════════════════════════════════════════════
+let historyStack = [], historyIndex = -1, _histTimer = null;
+function pushHistory() {
+  clearTimeout(_histTimer);
+  _histTimer = setTimeout(() => {
+    const captionEl = document.getElementById('caption');
+    const snap = { title: state.title, price: state.price, loc: state.loc, badge: state.badge,
+                    caption: captionEl ? captionEl.value : '' };
+    const last = historyStack[historyIndex];
+    if (last && JSON.stringify(last) === JSON.stringify(snap)) return;
+    historyStack = historyStack.slice(0, historyIndex + 1);
+    historyStack.push(snap);
+    if (historyStack.length > 50) historyStack.shift();
+    historyIndex = historyStack.length - 1;
+  }, 500);
+}
+function applyHistorySnap(snap) {
+  if (!snap) return;
+  state.title = snap.title; state.price = snap.price; state.loc = snap.loc; state.badge = snap.badge;
+  const fTitle = document.getElementById('fTitle'), fPrice = document.getElementById('fPrice'),
+        fLoc = document.getElementById('fLoc'), fBadge = document.getElementById('fBadge'), cap = document.getElementById('caption');
+  if (fTitle) fTitle.value = snap.title; if (fPrice) fPrice.value = snap.price;
+  if (fLoc) fLoc.value = snap.loc; if (fBadge) fBadge.value = snap.badge;
+  if (cap) cap.value = snap.caption;
+  draw();
+}
+function undoEdit() { if (historyIndex > 0) { historyIndex--; applyHistorySnap(historyStack[historyIndex]); } }
+function redoEdit() { if (historyIndex < historyStack.length - 1) { historyIndex++; applyHistorySnap(historyStack[historyIndex]); } }
+document.addEventListener('keydown', (e) => {
+  const mod = e.ctrlKey || e.metaKey;
+  if (!mod || e.key.toLowerCase() !== 'z') return;
+  e.preventDefault();
+  if (e.shiftKey) redoEdit(); else undoEdit();
+});
+
+// ═══════════════════════════════════════════════════════════════
+//  KITS DE MARCA — perfis guardados (nome, cores, site, idiomas…)
+//  para quem gere várias marcas/agentes na mesma app.
+// ═══════════════════════════════════════════════════════════════
+async function refreshBrandKitSelect() {
+  const sel = document.getElementById('brandKitSelect');
+  if (!sel) return;
+  const kits = (await idbGet('kits').catch(() => null)) || {};
+  const cur = sel.value;
+  // Usa APIs DOM seguras (createElement + textContent), não innerHTML —
+  // o nome do kit é texto escrito livremente pela pessoa (via prompt()) e
+  // nunca deve ser interpretado como HTML. Vulnerabilidade XSS real,
+  // confirmada e corrigida numa auditoria de segurança.
+  sel.innerHTML = '';
+  const noneOpt = document.createElement('option');
+  noneOpt.value = ''; noneOpt.textContent = '— nenhum —';
+  sel.appendChild(noneOpt);
+  Object.keys(kits).forEach(n => {
+    const opt = document.createElement('option');
+    opt.value = n; opt.textContent = n;
+    sel.appendChild(opt);
+  });
+  if (kits[cur]) sel.value = cur;
+}
+async function saveBrandKit() {
+  const name = prompt('Nome para este kit de marca (ex.: "Loja Sunset — Calçado"):');
+  if (!name) return;
+  const kits = (await idbGet('kits').catch(() => null)) || {};
+  kits[name] = { name: state.brand.name, site: state.brand.site, sub: state.brand.sub, phone: state.brand.phone,
+                 accent: state.brand.accent, showWatermark: state.brand.showWatermark, langs: [...state.brand.langs],
+                 category: state.category, spec: state.spec.map(s => ({ label: s.label, value: '' })) };
+  await idbSet('kits', kits);
+  await refreshBrandKitSelect();
+  document.getElementById('brandKitSelect').value = name;
+  toast('Kit "' + name + '" guardado');
+}
+async function applyBrandKit(name) {
+  if (!name) return;
+  const kits = (await idbGet('kits').catch(() => null)) || {};
+  const k = kits[name]; if (!k) return;
+  Object.assign(state.brand, k, { langs: new Set(k.langs && k.langs.length ? k.langs : ['pt', 'en']) });
+  document.getElementById('brandName').value = state.brand.name || '';
+  document.getElementById('brandSite').value = state.brand.site || '';
+  document.getElementById('brandSub').value = state.brand.sub || '';
+  document.getElementById('brandPhone').value = state.brand.phone || '';
+  document.getElementById('brandColor').value = state.brand.accent || '#B8935A';
+  document.getElementById('brandWatermark').checked = state.brand.showWatermark !== false;
+  setGoldVar(state.brand.accent || '#B8935A');
+  document.querySelectorAll('#langsSeg button').forEach(b => b.classList.toggle('active', state.brand.langs.has(b.dataset.l)));
+  renderLangSwitch();
+  // um kit também guarda a categoria/ficha típica deste negócio (só os rótulos, não valores antigos)
+  if (k.category && k.spec) {
+    state.category = k.category;
+    document.getElementById('fCategory').value = k.category;
+    k.spec.forEach((s, i) => {
+      if (!state.spec[i]) return;
+      state.spec[i].label = s.label || '';
+      const lblEl = document.getElementById('specLabel' + i);
+      if (lblEl) lblEl.value = s.label || '';
+    });
+  }
+  draw();
+  scheduleSaveDraft();
+  toast('Kit "' + name + '" aplicado');
+}
+async function deleteBrandKit() {
+  const sel = document.getElementById('brandKitSelect');
+  const name = sel.value; if (!name) return;
+  if (!confirm('Apagar o kit "' + name + '"?')) return;
+  const kits = (await idbGet('kits').catch(() => null)) || {};
+  delete kits[name];
+  await idbSet('kits', kits);
+  await refreshBrandKitSelect();
+  toast('Kit apagado');
+}
+
+// [I18N extraído para src/data/i18n.js — ver ficheiro]
+
+// ═══════════════════════════════════════════════════════════════
+//  TEXTOS DA INTERFACE — traduzidos nos 6 idiomas suportados.
+//  Diferente do I18N (que traduz o CONTEÚDO gerado — posts, legendas),
+//  isto traduz a própria interface de edição. Aplicado por applyUIStrings()
+//  sempre que o idioma ativo muda — a app deixa de "falar só português"
+//  para quem trabalha noutra língua.
+// ═══════════════════════════════════════════════════════════════
+// [UI_STRINGS extraído para src/data/i18n.js — ver ficheiro]
 function uiT(key) {
   const dict = UI_STRINGS[state.lang] || UI_STRINGS.pt;
   return (key in dict) ? dict[key] : (UI_STRINGS.pt[key] || '');
@@ -2112,190 +2319,7 @@ function wrapN(ctx, txt, maxW, maxLines) {
 // ── Dados extra por categoria (certificado energético, estrelas, alergénios,
 // tamanhos) — texto/emoji sobre o sistema de specsLine() já existente e
 // testado, sem precisar de desenho novo no canvas ──
-const ENERGY_LEVELS = ['A+', 'A', 'B', 'C', 'D', 'E', 'F'];
-const ENERGY_EMOJI = { 'A+':'🟢', 'A':'🟢', 'B':'🟢', 'C':'🟡', 'D':'🟡', 'E':'🟠', 'F':'🔴' };
-const SIZE_LIST = ['XS', 'S', 'M', 'L', 'XL', 'XXL'];
-const ALLERGEN_KEYS = ['gluten', 'lactose', 'ovos', 'frutosSecos', 'marisco', 'peixe', 'soja', 'mostarda'];
-const ALLERGEN_ICONS = { gluten:'🌾', lactose:'🥛', ovos:'🥚', frutosSecos:'🥜', marisco:'🦐', peixe:'🐟', soja:'🫘', mostarda:'🌭' };
-const ALLERGEN_NAMES = {
-  pt: { gluten:'Glúten', lactose:'Lactose', ovos:'Ovos', frutosSecos:'Frutos secos', marisco:'Marisco', peixe:'Peixe', soja:'Soja', mostarda:'Mostarda' },
-  en: { gluten:'Gluten', lactose:'Dairy', ovos:'Eggs', frutosSecos:'Nuts', marisco:'Shellfish', peixe:'Fish', soja:'Soy', mostarda:'Mustard' },
-  fr: { gluten:'Gluten', lactose:'Lactose', ovos:'Œufs', frutosSecos:'Fruits à coque', marisco:'Crustacés', peixe:'Poisson', soja:'Soja', mostarda:'Moutarde' },
-  es: { gluten:'Gluten', lactose:'Lactosa', ovos:'Huevos', frutosSecos:'Frutos secos', marisco:'Marisco', peixe:'Pescado', soja:'Soja', mostarda:'Mostaza' },
-  de: { gluten:'Gluten', lactose:'Laktose', ovos:'Eier', frutosSecos:'Nüsse', marisco:'Krebstiere', peixe:'Fisch', soja:'Soja', mostarda:'Senf' },
-  it: { gluten:'Glutine', lactose:'Lattosio', ovos:'Uova', frutosSecos:'Frutta a guscio', marisco:'Crostacei', peixe:'Pesce', soja:'Soia', mostarda:'Senape' }
-};
-function specsLine() {
-  const parts = (state.spec || []).filter(s => s.value).map(s => (s.label ? s.label + ': ' : '') + s.value);
-  const t = I18N[state.lang] || I18N.pt;
-  if (state.category === 'imoveis' && state.energyRating) {
-    parts.push((ENERGY_EMOJI[state.energyRating] || '') + ' ' + t.energyClassLabel + ' ' + state.energyRating);
-  }
-  if (state.category === 'viagens' && state.starRating > 0) {
-    parts.push('★'.repeat(state.starRating) + '☆'.repeat(5 - state.starRating));
-  }
-  if (state.category === 'gastronomia' && state.allergens.length) {
-    parts.push(state.allergens.map(a => ALLERGEN_ICONS[a] || '').join(' '));
-  }
-  if (state.category === 'moda' && state.sizes.length) {
-    parts.push(t.sizesLabel + ' ' + state.sizes.join('/'));
-  }
-  return parts.join('   ·   ');
-}
-function onSpecChange(idx, value) {
-  state.spec[idx].value = value;
-  if (idx === 0) renderCategoryExtras(); // área interior é o campo 0 — recalcula €/m² ao vivo
-  draw();
-  scheduleSaveDraft();
-}
-function onSpecLabelChange(idx, value) {
-  state.spec[idx].label = value;
-  draw();
-  scheduleSaveDraft();
-}
-// Presets por idioma — a categoria escolhida preenche os rótulos na língua ativa,
-// mas continuam 100% editáveis. Trocar o idioma da interface depois de escolher a
-// categoria não reescreve o que já foi personalizado (só uma nova escolha o faz).
-const CATEGORY_PRESETS = {
-  pt: {
-    generico:  ['Característica 1', 'Característica 2', 'Característica 3', 'Característica 4'],
-    imoveis:   ['Área interior (m²)', 'Quartos', 'Área exterior (m²)', 'Lugares de garagem'],
-    carros:    ['Marca / Modelo', 'Ano', 'Quilómetros', 'Combustível'],
-    viagens:   ['Destino', 'Duração', 'Datas', 'Regime'],
-    moda:      ['Tamanho', 'Cor', 'Material', 'Marca'],
-    cosmetica: ['Tipo / Uso', 'Volume', 'Ingrediente-chave', 'Marca'],
-    casa:      ['Tipo de peça', 'Material', 'Dimensões', 'Marca'],
-    gastronomia: ['Tipo de cozinha', 'Porção', 'Ingredientes-chave', 'Restrições']
-  },
-  en: {
-    generico:  ['Feature 1', 'Feature 2', 'Feature 3', 'Feature 4'],
-    imoveis:   ['Interior area (m²)', 'Bedrooms', 'Outdoor area (m²)', 'Parking spaces'],
-    carros:    ['Make / Model', 'Year', 'Mileage', 'Fuel type'],
-    viagens:   ['Destination', 'Duration', 'Dates', 'Board basis'],
-    moda:      ['Size', 'Colour', 'Material', 'Brand'],
-    cosmetica: ['Type / Use', 'Volume', 'Key ingredient', 'Brand'],
-    casa:      ['Item type', 'Material', 'Dimensions', 'Brand'],
-    gastronomia: ['Cuisine type', 'Serves', 'Key ingredients', 'Dietary info']
-  },
-  fr: {
-    generico:  ['Caractéristique 1', 'Caractéristique 2', 'Caractéristique 3', 'Caractéristique 4'],
-    imoveis:   ['Surface intérieure (m²)', 'Chambres', 'Surface extérieure (m²)', 'Places de parking'],
-    carros:    ['Marque / Modèle', 'Année', 'Kilométrage', 'Carburant'],
-    viagens:   ['Destination', 'Durée', 'Dates', 'Formule'],
-    moda:      ['Taille', 'Couleur', 'Matière', 'Marque'],
-    cosmetica: ['Type / Usage', 'Volume', 'Ingrédient clé', 'Marque'],
-    casa:      ['Type de pièce', 'Matière', 'Dimensions', 'Marque'],
-    gastronomia: ['Type de cuisine', 'Portion', 'Ingrédients clés', 'Régimes spéciaux']
-  },
-  es: {
-    generico:  ['Característica 1', 'Característica 2', 'Característica 3', 'Característica 4'],
-    imoveis:   ['Superficie interior (m²)', 'Habitaciones', 'Superficie exterior (m²)', 'Plazas de garaje'],
-    carros:    ['Marca / Modelo', 'Año', 'Kilómetros', 'Combustible'],
-    viagens:   ['Destino', 'Duración', 'Fechas', 'Régimen'],
-    moda:      ['Talla', 'Color', 'Material', 'Marca'],
-    cosmetica: ['Tipo / Uso', 'Volumen', 'Ingrediente clave', 'Marca'],
-    casa:      ['Tipo de pieza', 'Material', 'Dimensiones', 'Marca'],
-    gastronomia: ['Tipo de cocina', 'Ración', 'Ingredientes clave', 'Información dietética']
-  },
-  de: {
-    generico:  ['Merkmal 1', 'Merkmal 2', 'Merkmal 3', 'Merkmal 4'],
-    imoveis:   ['Wohnfläche (m²)', 'Zimmer', 'Außenfläche (m²)', 'Stellplätze'],
-    carros:    ['Marke / Modell', 'Baujahr', 'Kilometerstand', 'Kraftstoff'],
-    viagens:   ['Reiseziel', 'Dauer', 'Termine', 'Verpflegung'],
-    moda:      ['Größe', 'Farbe', 'Material', 'Marke'],
-    cosmetica: ['Typ / Anwendung', 'Volumen', 'Hauptinhaltsstoff', 'Marke'],
-    casa:      ['Art des Stücks', 'Material', 'Maße', 'Marke'],
-    gastronomia: ['Küchenstil', 'Portion', 'Hauptzutaten', 'Ernährungshinweise']
-  },
-  it: {
-    generico:  ['Caratteristica 1', 'Caratteristica 2', 'Caratteristica 3', 'Caratteristica 4'],
-    imoveis:   ['Superficie interna (m²)', 'Camere', 'Superficie esterna (m²)', 'Posti auto'],
-    carros:    ['Marca / Modello', 'Anno', 'Chilometraggio', 'Alimentazione'],
-    viagens:   ['Destinazione', 'Durata', 'Date', 'Trattamento'],
-    moda:      ['Taglia', 'Colore', 'Materiale', 'Marca'],
-    cosmetica: ['Tipo / Uso', 'Volume', 'Ingrediente chiave', 'Marca'],
-    casa:      ['Tipo di pezzo', 'Materiale', 'Dimensioni', 'Marca'],
-    gastronomia: ['Tipo di cucina', 'Porzione', 'Ingredienti chiave', 'Info alimentari']
-  }
-};
-// Paleta sugerida por categoria — poupa o clique de escolher cor à mão.
-// Só se aplica enquanto a pessoa não tiver personalizado a cor/fundo ela
-// própria (ver state._styleCustomized) — a automação nunca pisa uma escolha
-// manual já feita.
-const CATEGORY_PALETTES = {
-  generico:    { accent: '#B8935A', bg: 'dark'  },
-  imoveis:     { accent: '#B8935A', bg: 'dark'  },
-  carros:      { accent: '#6B8CAE', bg: 'dark'  },
-  viagens:     { accent: '#D97A4D', bg: 'grad'  },
-  moda:        { accent: '#A67C87', bg: 'light' },
-  cosmetica:   { accent: '#C98BA0', bg: 'light' },
-  casa:        { accent: '#7A8B5E', bg: 'light' },
-  gastronomia: { accent: '#B5502E', bg: 'dark'  }
-};
-// Selos sugeridos por categoria — um clique preenche o campo "Selo", em vez de
-// escrever de raiz. Continua 100% editável a seguir.
-const CATEGORY_BADGES = {
-  pt: {
-    generico:    ['Novo', 'Promoção', 'Exclusivo', 'Limitado'],
-    imoveis:     ['Novo no Mercado', 'Reservado', 'Venda Urgente', 'Oportunidade'],
-    carros:      ['Garantia Incluída', 'Único Dono', 'Sem Acidentes', 'Revisões em Dia'],
-    viagens:     ['Últimas Vagas', 'Oferta Especial', 'Só Este Mês', 'Lotação Limitada'],
-    moda:        ['Novo', 'Saldo', 'Edição Limitada', 'Últimas Peças'],
-    cosmetica:   ['Novo', 'Mais Vendido', 'Edição Limitada', 'Promoção'],
-    casa:        ['Novo', 'Peça Única', 'Em Stock', 'Promoção'],
-    gastronomia: ['Prato do Dia', 'Novo no Menu', 'Edição Especial', 'Só Hoje']
-  },
-  en: {
-    generico:    ['New', 'Sale', 'Exclusive', 'Limited'],
-    imoveis:     ['New Listing', 'Under Offer', 'Quick Sale', 'Great Opportunity'],
-    carros:      ['Warranty Included', 'One Owner', 'Accident-Free', 'Full Service History'],
-    viagens:     ['Last Spots', 'Special Offer', 'This Month Only', 'Limited Availability'],
-    moda:        ['New', 'Sale', 'Limited Edition', 'Last Pieces'],
-    cosmetica:   ['New', 'Best Seller', 'Limited Edition', 'Sale'],
-    casa:        ['New', 'One of a Kind', 'In Stock', 'Sale'],
-    gastronomia: ['Dish of the Day', 'New on the Menu', 'Special Edition', 'Today Only']
-  },
-  fr: {
-    generico:    ['Nouveau', 'Promotion', 'Exclusif', 'Édition limitée'],
-    imoveis:     ['Nouveau sur le marché', 'Sous offre', 'Vente urgente', 'Belle opportunité'],
-    carros:      ['Garantie incluse', 'Un seul propriétaire', 'Sans accident', 'Entretien à jour'],
-    viagens:     ['Dernières places', 'Offre spéciale', 'Ce mois-ci seulement', 'Places limitées'],
-    moda:        ['Nouveau', 'Soldes', 'Édition limitée', 'Dernières pièces'],
-    cosmetica:   ['Nouveau', 'Meilleure vente', 'Édition limitée', 'Promotion'],
-    casa:        ['Nouveau', 'Pièce unique', 'En stock', 'Promotion'],
-    gastronomia: ['Plat du jour', 'Nouveau au menu', 'Édition spéciale', 'Aujourd\u2019hui seulement']
-  },
-  es: {
-    generico:    ['Nuevo', 'Oferta', 'Exclusivo', 'Edición limitada'],
-    imoveis:     ['Nuevo en el mercado', 'Reservado', 'Venta urgente', 'Gran oportunidad'],
-    carros:      ['Garantía incluida', 'Único dueño', 'Sin accidentes', 'Revisiones al día'],
-    viagens:     ['Últimas plazas', 'Oferta especial', 'Solo este mes', 'Plazas limitadas'],
-    moda:        ['Nuevo', 'Rebajas', 'Edición limitada', 'Últimas piezas'],
-    cosmetica:   ['Nuevo', 'Más vendido', 'Edición limitada', 'Oferta'],
-    casa:        ['Nuevo', 'Pieza única', 'En stock', 'Oferta'],
-    gastronomia: ['Plato del día', 'Nuevo en el menú', 'Edición especial', 'Solo hoy']
-  },
-  de: {
-    generico:    ['Neu', 'Angebot', 'Exklusiv', 'Limitiert'],
-    imoveis:     ['Neu auf dem Markt', 'Reserviert', 'Dringender Verkauf', 'Tolle Gelegenheit'],
-    carros:      ['Garantie inklusive', 'Einzelbesitzer', 'Unfallfrei', 'Scheckheftgepflegt'],
-    viagens:     ['Letzte Plätze', 'Sonderangebot', 'Nur diesen Monat', 'Begrenzte Plätze'],
-    moda:        ['Neu', 'Sale', 'Limitierte Auflage', 'Letzte Stücke'],
-    cosmetica:   ['Neu', 'Bestseller', 'Limitierte Auflage', 'Angebot'],
-    casa:        ['Neu', 'Unikat', 'Auf Lager', 'Angebot'],
-    gastronomia: ['Tagesgericht', 'Neu auf der Karte', 'Sonderedition', 'Nur heute']
-  },
-  it: {
-    generico:    ['Nuovo', 'Promozione', 'Esclusivo', 'Edizione limitata'],
-    imoveis:     ['Nuovo sul mercato', 'Riservato', 'Vendita urgente', 'Ottima occasione'],
-    carros:      ['Garanzia inclusa', 'Unico proprietario', 'Senza incidenti', 'Tagliandi in regola'],
-    viagens:     ['Ultimi posti', 'Offerta speciale', 'Solo questo mese', 'Posti limitati'],
-    moda:        ['Nuovo', 'Saldi', 'Edizione limitata', 'Ultimi pezzi'],
-    cosmetica:   ['Nuovo', 'Più venduto', 'Edizione limitata', 'Promozione'],
-    casa:        ['Nuovo', 'Pezzo unico', 'Disponibile', 'Promozione'],
-    gastronomia: ['Piatto del giorno', 'Novità nel menu', 'Edizione speciale', 'Solo oggi']
-  }
-};
+// [ENERGY_*/SIZE_LIST/ALLERGEN_*/CATEGORY_* extraídos para src/data/categories.js — ver ficheiro]
 function renderBadgeChips() {
   const wrap = document.getElementById('badgeChips');
   if (!wrap) return;
@@ -3285,6 +3309,7 @@ if ('serviceWorker' in navigator) {
 }
 
 loadAll();
+
 </script>
 </body>
 </html>
