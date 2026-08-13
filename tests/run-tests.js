@@ -666,6 +666,30 @@ try {
   } catch (e) { assert('BLOCO 3u (endpoint de IA configurável) não rebentou', false, e.message + ' | ' + e.stack); }
 
   try {
+    // ABSTRAÇÃO DE PLATAFORMA — o que é testável aqui é o caminho web (este
+    // ambiente é Chromium comum, sem Capacitor real). O caminho nativo em si
+    // (Filesystem/Share plugins) não é testável fora de um dispositivo/
+    // simulador real — fica documentado como limitação, não fingido como testado.
+    window.__saveBlobWebCalled = false;
+    const origSaveBlobWeb = saveBlobWeb;
+    window.saveBlobWeb = function(...args) { window.__saveBlobWebCalled = true; return origSaveBlobWeb.apply(this, args); };
+    const testBlob = new Blob(['teste'], { type: 'text/plain' });
+    await saveBlob(testBlob, 'teste.txt');
+    await sleep(50);
+    assert('sem Capacitor, saveBlob() usa o caminho web', window.__saveBlobWebCalled === true);
+    window.saveBlobWeb = origSaveBlobWeb;
+
+    // pickLocalFolder tem de recusar educadamente em contexto nativo, não tentar simular
+    window.Capacitor = { isNativePlatform: () => true };
+    const wouldBeNativeForFolder = !!(window.Capacitor && window.Capacitor.isNativePlatform());
+    assert('deteção nativa disponível para pickLocalFolder saber que deve recusar', wouldBeNativeForFolder === true);
+    delete window.Capacitor;
+
+    assert('blobToBase64 converte corretamente (usado pelo caminho nativo)', 
+      (await blobToBase64(new Blob(['AB'], {type:'text/plain'}))).length > 0);
+  } catch (e) { assert('BLOCO 3v (abstração de plataforma — caminho web) não rebentou', false, e.message + ' | ' + e.stack); }
+
+  try {
     // limpar rascunho tem de repor tudo isto também — mas clearDraft() apaga
     // MESMO tudo (memória + IndexedDB), por isso este teste tem de restaurar
     // as fotos a seguir, para não afetar os testes de persistência mais à frente

@@ -5,7 +5,7 @@
 // Isto evita o problema mais comum de service workers — servir conteúdo
 // desatualizado depois de uma atualização.
 const CACHE_NAME = 'my-studio-shell-v1';
-const SHELL_FILES = ['./my-studio.html', './manifest.webmanifest', './icon-192.png'];
+const SHELL_FILES = ['./index.html', './manifest.webmanifest', './icon-192.png'];
 
 self.addEventListener('install', (event) => {
   event.waitUntil(
