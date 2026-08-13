@@ -782,6 +782,46 @@ try {
   } catch (e) { assert('BLOCO 3x (selo cortado no Minimalista — regressão) não rebentou', false, e.message + ' | ' + e.stack); }
 
   try {
+    // 3 CATEGORIAS NOVAS — Desporto & Fitness, Serviços Profissionais, Eventos
+    const options = [...document.getElementById('fCategory').options].map(o => o.value);
+    ['desporto', 'servicos', 'eventos'].forEach(cat => {
+      assert('categoria "' + cat + '" existe no menu', options.includes(cat), options);
+    });
+
+    applyCategoryPreset('desporto');
+    await sleep(50);
+    assert('preset "desporto" preenche rótulos coerentes', state.spec[0].label === 'Modalidade' && state.spec[2].label === 'Nível', JSON.stringify(state.spec));
+    assert('desporto sugere paleta própria', state.brand.accent === '#D9583A', state.brand.accent);
+    const chipsDesporto = [...document.querySelectorAll('#badgeChips .chip')].map(b => b.textContent);
+    assert('desporto tem 4 selos sugeridos coerentes', chipsDesporto.includes('Nova Turma'), chipsDesporto);
+
+    applyCategoryPreset('servicos');
+    await sleep(50);
+    assert('preset "servicos" preenche rótulos coerentes', state.spec[0].label === 'Especialidade' && state.spec[3].label === 'Modalidade', JSON.stringify(state.spec));
+    assert('servicos sugere fundo claro (contexto profissional)', state.bg === 'light', state.bg);
+
+    applyCategoryPreset('eventos');
+    await sleep(50);
+    assert('preset "eventos" preenche rótulos coerentes', state.spec[0].label === 'Tipo de evento' && state.spec[1].label === 'Data', JSON.stringify(state.spec));
+    assert('eventos sugere fundo degradê (mais festivo)', state.bg === 'grad', state.bg);
+    onSpecChange(0, 'Casamento'); onSpecChange(1, '20 Set 2026');
+    assert('ficha de eventos aceita valores normalmente', specsLine().includes('Casamento') && specsLine().includes('20 Set 2026'), specsLine());
+
+    // confirmar tradução: em inglês, os rótulos do menu mudam
+    setLang('en');
+    await sleep(80);
+    const catSelectEN = document.getElementById('fCategory');
+    const desportoOptEN = [...catSelectEN.options].find(o => o.value === 'desporto');
+    assert('categoria "desporto" traduz para inglês no menu', desportoOptEN.textContent === 'Sports & Fitness', desportoOptEN.textContent);
+    applyCategoryPreset('desporto');
+    await sleep(50);
+    assert('preset "desporto" também traduz os rótulos da ficha', state.spec[0].label === 'Activity type', state.spec[0].label);
+    setLang('pt');
+    await sleep(80);
+    applyCategoryPreset('generico');
+  } catch (e) { assert('BLOCO 3y (3 categorias novas: desporto, serviços, eventos) não rebentou', false, e.message + ' | ' + e.stack); }
+
+  try {
     // limpar rascunho tem de repor tudo isto também — mas clearDraft() apaga
     // MESMO tudo (memória + IndexedDB), por isso este teste tem de restaurar
     // as fotos a seguir, para não afetar os testes de persistência mais à frente

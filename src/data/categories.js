@@ -55,7 +55,10 @@ const CATEGORY_PRESETS = {
     moda:      ['Tamanho', 'Cor', 'Material', 'Marca'],
     cosmetica: ['Tipo / Uso', 'Volume', 'Ingrediente-chave', 'Marca'],
     casa:      ['Tipo de peça', 'Material', 'Dimensões', 'Marca'],
-    gastronomia: ['Tipo de cozinha', 'Porção', 'Ingredientes-chave', 'Restrições']
+    gastronomia: ['Tipo de cozinha', 'Porção', 'Ingredientes-chave', 'Restrições'],
+    desporto: ['Modalidade', 'Duração', 'Nível', 'Inclui'],
+    servicos: ['Especialidade', 'Experiência', 'Disponibilidade', 'Modalidade'],
+    eventos: ['Tipo de evento', 'Data', 'Local', 'Capacidade']
   },
   en: {
     generico:  ['Feature 1', 'Feature 2', 'Feature 3', 'Feature 4'],
@@ -65,7 +68,10 @@ const CATEGORY_PRESETS = {
     moda:      ['Size', 'Colour', 'Material', 'Brand'],
     cosmetica: ['Type / Use', 'Volume', 'Key ingredient', 'Brand'],
     casa:      ['Item type', 'Material', 'Dimensions', 'Brand'],
-    gastronomia: ['Cuisine type', 'Serves', 'Key ingredients', 'Dietary info']
+    gastronomia: ['Cuisine type', 'Serves', 'Key ingredients', 'Dietary info'],
+    desporto: ['Activity type', 'Duration', 'Level', 'Includes'],
+    servicos: ['Specialty', 'Experience', 'Availability', 'Format'],
+    eventos: ['Event type', 'Date', 'Venue', 'Capacity']
   },
   fr: {
     generico:  ['Caractéristique 1', 'Caractéristique 2', 'Caractéristique 3', 'Caractéristique 4'],
@@ -75,7 +81,10 @@ const CATEGORY_PRESETS = {
     moda:      ['Taille', 'Couleur', 'Matière', 'Marque'],
     cosmetica: ['Type / Usage', 'Volume', 'Ingrédient clé', 'Marque'],
     casa:      ['Type de pièce', 'Matière', 'Dimensions', 'Marque'],
-    gastronomia: ['Type de cuisine', 'Portion', 'Ingrédients clés', 'Régimes spéciaux']
+    gastronomia: ['Type de cuisine', 'Portion', 'Ingrédients clés', 'Régimes spéciaux'],
+    desporto: ['Type d\u2019activité', 'Durée', 'Niveau', 'Inclus'],
+    servicos: ['Spécialité', 'Expérience', 'Disponibilité', 'Format'],
+    eventos: ['Type d\u2019événement', 'Date', 'Lieu', 'Capacité']
   },
   es: {
     generico:  ['Característica 1', 'Característica 2', 'Característica 3', 'Característica 4'],
@@ -85,7 +94,10 @@ const CATEGORY_PRESETS = {
     moda:      ['Talla', 'Color', 'Material', 'Marca'],
     cosmetica: ['Tipo / Uso', 'Volumen', 'Ingrediente clave', 'Marca'],
     casa:      ['Tipo de pieza', 'Material', 'Dimensiones', 'Marca'],
-    gastronomia: ['Tipo de cocina', 'Ración', 'Ingredientes clave', 'Información dietética']
+    gastronomia: ['Tipo de cocina', 'Ración', 'Ingredientes clave', 'Información dietética'],
+    desporto: ['Tipo de actividad', 'Duración', 'Nivel', 'Incluye'],
+    servicos: ['Especialidad', 'Experiencia', 'Disponibilidad', 'Modalidad'],
+    eventos: ['Tipo de evento', 'Fecha', 'Lugar', 'Capacidad']
   },
   de: {
     generico:  ['Merkmal 1', 'Merkmal 2', 'Merkmal 3', 'Merkmal 4'],
@@ -95,7 +107,10 @@ const CATEGORY_PRESETS = {
     moda:      ['Größe', 'Farbe', 'Material', 'Marke'],
     cosmetica: ['Typ / Anwendung', 'Volumen', 'Hauptinhaltsstoff', 'Marke'],
     casa:      ['Art des Stücks', 'Material', 'Maße', 'Marke'],
-    gastronomia: ['Küchenstil', 'Portion', 'Hauptzutaten', 'Ernährungshinweise']
+    gastronomia: ['Küchenstil', 'Portion', 'Hauptzutaten', 'Ernährungshinweise'],
+    desporto: ['Aktivitätsart', 'Dauer', 'Niveau', 'Enthält'],
+    servicos: ['Spezialgebiet', 'Erfahrung', 'Verfügbarkeit', 'Format'],
+    eventos: ['Veranstaltungsart', 'Datum', 'Ort', 'Kapazität']
   },
   it: {
     generico:  ['Caratteristica 1', 'Caratteristica 2', 'Caratteristica 3', 'Caratteristica 4'],
@@ -105,7 +120,10 @@ const CATEGORY_PRESETS = {
     moda:      ['Taglia', 'Colore', 'Materiale', 'Marca'],
     cosmetica: ['Tipo / Uso', 'Volume', 'Ingrediente chiave', 'Marca'],
     casa:      ['Tipo di pezzo', 'Materiale', 'Dimensioni', 'Marca'],
-    gastronomia: ['Tipo di cucina', 'Porzione', 'Ingredienti chiave', 'Info alimentari']
+    gastronomia: ['Tipo di cucina', 'Porzione', 'Ingredienti chiave', 'Info alimentari'],
+    desporto: ['Tipo di attività', 'Durata', 'Livello', 'Include'],
+    servicos: ['Specialità', 'Esperienza', 'Disponibilità', 'Modalità'],
+    eventos: ['Tipo di evento', 'Data', 'Luogo', 'Capienza']
   }
 };
 // Paleta sugerida por categoria — poupa o clique de escolher cor à mão.
@@ -120,7 +138,10 @@ const CATEGORY_PALETTES = {
   moda:        { accent: '#A67C87', bg: 'light' },
   cosmetica:   { accent: '#C98BA0', bg: 'light' },
   casa:        { accent: '#7A8B5E', bg: 'light' },
-  gastronomia: { accent: '#B5502E', bg: 'dark'  }
+  gastronomia: { accent: '#B5502E', bg: 'dark'  },
+  desporto:    { accent: '#D9583A', bg: 'dark'  },
+  servicos:    { accent: '#4A6B8A', bg: 'light' },
+  eventos:     { accent: '#9B4F8A', bg: 'grad'  }
 };
 // Selos sugeridos por categoria — um clique preenche o campo "Selo", em vez de
 // escrever de raiz. Continua 100% editável a seguir.
@@ -133,7 +154,10 @@ const CATEGORY_BADGES = {
     moda:        ['Novo', 'Saldo', 'Edição Limitada', 'Últimas Peças'],
     cosmetica:   ['Novo', 'Mais Vendido', 'Edição Limitada', 'Promoção'],
     casa:        ['Novo', 'Peça Única', 'Em Stock', 'Promoção'],
-    gastronomia: ['Prato do Dia', 'Novo no Menu', 'Edição Especial', 'Só Hoje']
+    gastronomia: ['Prato do Dia', 'Novo no Menu', 'Edição Especial', 'Só Hoje'],
+    desporto:    ['Nova Turma', 'Vagas Limitadas', 'Primeira Aula Grátis', 'Inscrições Abertas'],
+    servicos:    ['Consulta Gratuita', 'Disponível Já', 'Novo Serviço', 'Vagas Limitadas'],
+    eventos:     ['Últimas Vagas', 'Reserva Já', 'Evento Especial', 'Compra Antecipada']
   },
   en: {
     generico:    ['New', 'Sale', 'Exclusive', 'Limited'],
@@ -143,7 +167,10 @@ const CATEGORY_BADGES = {
     moda:        ['New', 'Sale', 'Limited Edition', 'Last Pieces'],
     cosmetica:   ['New', 'Best Seller', 'Limited Edition', 'Sale'],
     casa:        ['New', 'One of a Kind', 'In Stock', 'Sale'],
-    gastronomia: ['Dish of the Day', 'New on the Menu', 'Special Edition', 'Today Only']
+    gastronomia: ['Dish of the Day', 'New on the Menu', 'Special Edition', 'Today Only'],
+    desporto:    ['New Class', 'Limited Spots', 'Free First Class', 'Registration Open'],
+    servicos:    ['Free Consultation', 'Available Now', 'New Service', 'Limited Availability'],
+    eventos:     ['Last Spots', 'Book Now', 'Special Event', 'Early Bird']
   },
   fr: {
     generico:    ['Nouveau', 'Promotion', 'Exclusif', 'Édition limitée'],
@@ -153,7 +180,10 @@ const CATEGORY_BADGES = {
     moda:        ['Nouveau', 'Soldes', 'Édition limitée', 'Dernières pièces'],
     cosmetica:   ['Nouveau', 'Meilleure vente', 'Édition limitée', 'Promotion'],
     casa:        ['Nouveau', 'Pièce unique', 'En stock', 'Promotion'],
-    gastronomia: ['Plat du jour', 'Nouveau au menu', 'Édition spéciale', 'Aujourd\u2019hui seulement']
+    gastronomia: ['Plat du jour', 'Nouveau au menu', 'Édition spéciale', 'Aujourd\u2019hui seulement'],
+    desporto:    ['Nouveau cours', 'Places limitées', 'Premier cours gratuit', 'Inscriptions ouvertes'],
+    servicos:    ['Consultation gratuite', 'Disponible maintenant', 'Nouveau service', 'Places limitées'],
+    eventos:     ['Dernières places', 'Réserver maintenant', 'Événement spécial', 'Tarif anticipé']
   },
   es: {
     generico:    ['Nuevo', 'Oferta', 'Exclusivo', 'Edición limitada'],
@@ -163,7 +193,10 @@ const CATEGORY_BADGES = {
     moda:        ['Nuevo', 'Rebajas', 'Edición limitada', 'Últimas piezas'],
     cosmetica:   ['Nuevo', 'Más vendido', 'Edición limitada', 'Oferta'],
     casa:        ['Nuevo', 'Pieza única', 'En stock', 'Oferta'],
-    gastronomia: ['Plato del día', 'Nuevo en el menú', 'Edición especial', 'Solo hoy']
+    gastronomia: ['Plato del día', 'Nuevo en el menú', 'Edición especial', 'Solo hoy'],
+    desporto:    ['Nueva Clase', 'Plazas Limitadas', 'Primera Clase Gratis', 'Inscripciones Abiertas'],
+    servicos:    ['Consulta Gratuita', 'Disponible Ya', 'Nuevo Servicio', 'Plazas Limitadas'],
+    eventos:     ['Últimas Plazas', 'Reserva Ya', 'Evento Especial', 'Compra Anticipada']
   },
   de: {
     generico:    ['Neu', 'Angebot', 'Exklusiv', 'Limitiert'],
@@ -173,7 +206,10 @@ const CATEGORY_BADGES = {
     moda:        ['Neu', 'Sale', 'Limitierte Auflage', 'Letzte Stücke'],
     cosmetica:   ['Neu', 'Bestseller', 'Limitierte Auflage', 'Angebot'],
     casa:        ['Neu', 'Unikat', 'Auf Lager', 'Angebot'],
-    gastronomia: ['Tagesgericht', 'Neu auf der Karte', 'Sonderedition', 'Nur heute']
+    gastronomia: ['Tagesgericht', 'Neu auf der Karte', 'Sonderedition', 'Nur heute'],
+    desporto:    ['Neuer Kurs', 'Begrenzte Plätze', 'Erste Stunde Gratis', 'Anmeldung Offen'],
+    servicos:    ['Kostenlose Beratung', 'Jetzt Verfügbar', 'Neuer Service', 'Begrenzte Verfügbarkeit'],
+    eventos:     ['Letzte Plätze', 'Jetzt Buchen', 'Besonderes Event', 'Frühbucherpreis']
   },
   it: {
     generico:    ['Nuovo', 'Promozione', 'Esclusivo', 'Edizione limitata'],
@@ -183,6 +219,9 @@ const CATEGORY_BADGES = {
     moda:        ['Nuovo', 'Saldi', 'Edizione limitata', 'Ultimi pezzi'],
     cosmetica:   ['Nuovo', 'Più venduto', 'Edizione limitata', 'Promozione'],
     casa:        ['Nuovo', 'Pezzo unico', 'Disponibile', 'Promozione'],
-    gastronomia: ['Piatto del giorno', 'Novità nel menu', 'Edizione speciale', 'Solo oggi']
+    gastronomia: ['Piatto del giorno', 'Novità nel menu', 'Edizione speciale', 'Solo oggi'],
+    desporto:    ['Nuovo Corso', 'Posti Limitati', 'Prima Lezione Gratis', 'Iscrizioni Aperte'],
+    servicos:    ['Consulenza Gratuita', 'Disponibile Ora', 'Nuovo Servizio', 'Posti Limitati'],
+    eventos:     ['Ultimi Posti', 'Prenota Ora', 'Evento Speciale', 'Prevendita']
   }
 };
