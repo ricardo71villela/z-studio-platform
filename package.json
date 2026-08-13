@@ -8,6 +8,7 @@
     "dev": "node scripts/dev.js",
     "build": "node scripts/build.js",
     "sync": "npm run build && npm run sync --prefix native",
+    "build:android": "npm run sync && cd native/android && ./gradlew assembleDebug",
     "test": "npm test --prefix tests -- ../app/my-studio.html",
     "test:mobile": "npm run test:mobile --prefix tests -- ../app/my-studio.html",
     "test:visual": "node scripts/test-visual.js"
