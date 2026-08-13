@@ -1037,6 +1037,19 @@ function spaced(ctx, txt, cx, y, ls) {
   [...txt].forEach((ch, i) => { ctx.fillText(ch, x, y); x += widths[i] + ls; });
   ctx.textAlign = 'center';
 }
+// Variante alinhada à esquerda de spaced() — a original trata sempre o 3º
+// parâmetro como CENTRO do texto (cx), nunca como margem esquerda. Usar a
+// original com um valor de margem (ex. 64*FS) para texto comprido empurra
+// o início para coordenadas negativas, cortando as primeiras letras fora
+// do canvas — foi exatamente o bug encontrado no selo do template
+// Minimalista ("OPORTUNIDADE" a aparecer como "ORTUNIDADE").
+function spacedLeft(ctx, txt, x0, y, ls) {
+  const prevAlign = ctx.textAlign;
+  ctx.textAlign = 'left';
+  let x = x0;
+  [...txt].forEach((ch, i) => { ctx.fillText(ch, x, y); x += ctx.measureText(ch).width + ls; });
+  ctx.textAlign = prevAlign;
+}
 function fitText(ctx, txt, maxW, font, minSize, maxSize) {
   let size = maxSize;
   do { ctx.font = font.replace('SIZE', size); if (ctx.measureText(txt).width <= maxW) break; size -= 2; } while (size > minSize);
@@ -1339,7 +1352,7 @@ async function drawListing(ctx, W, H) {
 
     if (state.badge) {
       ctx.textAlign = 'left'; ctx.fillStyle = P.gold; ctx.font = `400 ${22*FS}px "DM Sans", sans-serif`;
-      spaced(ctx, state.badge.toUpperCase(), 64*FS, H - barH + 46*FS, 6*FS);
+      spacedLeft(ctx, state.badge.toUpperCase(), 64*FS, H - barH + 46*FS, 6*FS);
     }
     ctx.textAlign = 'left'; ctx.fillStyle = P.ink;
     const ts = fitText(ctx, state.title, W - 128*FS, '500 SIZEpx "DM Sans", sans-serif', 30*FS, 44*FS);

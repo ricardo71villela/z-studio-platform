@@ -729,6 +729,59 @@ try {
   } catch (e) { assert('BLOCO 3w (vídeo curto Stories/Reels/TikTok) não rebentou', false, e.message + ' | ' + e.stack); }
 
   try {
+    // BUG REAL ENCONTRADO POR CAPTURA DE ECRÃ — selo do template Minimalista
+    // cortado à esquerda ("OPORTUNIDADE" a aparecer como "ORTUNIDADE").
+    // Causa: spaced() trata sempre o 3º parâmetro como CENTRO do texto, mas
+    // o Minimalista passava-lhe uma margem esquerda (64*FS) como se fosse
+    // início — para texto comprido, isso empurra o início para fora do
+    // canvas. Confirma-se aqui matematicamente, não só visualmente.
+    const fakeCtx = {
+      textAlign: 'left', font: '', fillStyle: '',
+      calls: [],
+      measureText(ch) { return { width: 10 }; }, // largura fixa para o teste ser previsível
+      fillText(ch, x, y) { this.calls.push({ ch, x, y }); }
+    };
+    spacedLeft(fakeCtx, 'OPORTUNIDADE', 64, 100, 6);
+    assert('spacedLeft começa exatamente na margem pedida (64), não deslocado', fakeCtx.calls[0].x === 64, fakeCtx.calls[0].x);
+    assert('spacedLeft nunca desloca para coordenadas negativas com texto comprido', fakeCtx.calls.every(c => c.x >= 64), fakeCtx.calls.map(c=>c.x));
+
+    // confirma que spaced() (a original, para texto CENTRADO) continua a
+    // comportar-se como esperado — não se partiu ao criar a variante nova
+    const fakeCtx2 = { textAlign: 'left', calls: [], measureText: () => ({ width: 10 }), fillText(ch, x, y) { this.calls.push({ ch, x, y }); } };
+    spaced(fakeCtx2, 'AB', 100, 50, 0); // 2 chars de 10px cada = 20px total, centrado em 100 → começa em 90
+    assert('spaced() continua centrado corretamente (não afetado pela correção)', fakeCtx2.calls[0].x === 90, fakeCtx2.calls[0].x);
+
+    // e a confirmação visual: o Minimalista com um selo comprido tem de
+    // desenhar conteúdo real na margem esquerda esperada, não ficar vazio ali
+    const photoSnapBadge = { photos: state.photos.slice(), photoFiles: state.photoFiles.slice() };
+    if (state.photos.length === 0) {
+      const f = await new Promise(res => { const c = document.createElement('canvas'); c.width=10; c.height=10; c.getContext('2d').fillRect(0,0,10,10); c.toBlob(b => res(new File([b],'b.png',{type:'image/png'})), 'image/png'); });
+      await handleUploadFiles([f]);
+    }
+    setTemplate('minimalista');
+    document.getElementById('fBadge').value = 'OPORTUNIDADE ÚNICA'; state.badge = 'OPORTUNIDADE ÚNICA';
+    await draw(); await sleep(100);
+    const canvas = document.getElementById('preview');
+    const ctx2d = canvas.getContext('2d');
+    const FS_test = Math.sqrt((canvas.width*canvas.height)/(1080*1350));
+    const expectedX = Math.round(64 * FS_test);
+    const barH_test = 220 * FS_test;
+    const badgeY = Math.round(canvas.height - barH_test + 46 * FS_test);
+    // varre uma pequena área à volta da posição esperada, em vez de um único
+    // pixel — o rendering de texto real varia um pouco (baseline, anti-aliasing)
+    const region = ctx2d.getImageData(expectedX, badgeY - 24, 60, 30).data;
+    let hasContent = false;
+    for (let i = 0; i < region.length; i += 4) {
+      if (region[i] > 20 || region[i+1] > 20 || region[i+2] > 20) { hasContent = true; break; }
+    }
+    assert('o selo desenha conteúdo visível junto à margem esquerda esperada', hasContent);
+    setTemplate('classico');
+    state.photos = photoSnapBadge.photos; state.photoFiles = photoSnapBadge.photoFiles;
+    document.getElementById('fBadge').value = ''; state.badge = '';
+    renderPhotoGrid();
+  } catch (e) { assert('BLOCO 3x (selo cortado no Minimalista — regressão) não rebentou', false, e.message + ' | ' + e.stack); }
+
+  try {
     // limpar rascunho tem de repor tudo isto também — mas clearDraft() apaga
     // MESMO tudo (memória + IndexedDB), por isso este teste tem de restaurar
     // as fotos a seguir, para não afetar os testes de persistência mais à frente
