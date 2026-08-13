@@ -24,13 +24,18 @@ function assemble() {
   const template = fs.readFileSync(path.join(SRC, 'template.html'), 'utf-8');
   const i18n = fs.readFileSync(path.join(SRC, 'data', 'i18n.js'), 'utf-8');
   const categories = fs.readFileSync(path.join(SRC, 'data', 'categories.js'), 'utf-8');
+  const stateModule = fs.readFileSync(path.join(SRC, 'state', 'state.js'), 'utf-8');
+  const storage = fs.readFileSync(path.join(SRC, 'storage', 'indexeddb.js'), 'utf-8');
   const main = fs.readFileSync(path.join(SRC, 'main.js'), 'utf-8');
 
   if (!template.includes(PLACEHOLDER)) {
     throw new Error('src/template.html não tem o placeholder ' + PLACEHOLDER + ' — a montagem não sabe onde inserir o script.');
   }
 
-  const script = [i18n, categories, main].join('\n\n');
+  // ordem importa: dados primeiro (main.js lê I18N/CATEGORY_* como já definidos),
+  // depois state (main.js lê/escreve em state diretamente), depois storage
+  // (main.js chama idbGet/idbSet/idbDelete), só depois o resto da lógica
+  const script = [i18n, categories, stateModule, storage, main].join('\n\n');
   const html = template.replace(PLACEHOLDER, script);
 
   fs.mkdirSync(path.dirname(OUTPUT), { recursive: true });

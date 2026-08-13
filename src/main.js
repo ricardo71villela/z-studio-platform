@@ -4,75 +4,8 @@
 // primeiro, já que main.js lê I18N/UI_STRINGS/CATEGORY_* diretamente).
 // Extraído de app/my-studio.html — Phase 2 da auditoria de estabilização.
 
-// ═══ ESTADO ═══
-const FORMATS = { feed45: [1080, 1350], square: [1080, 1080], story: [1080, 1920], wide: [1920, 1080], pin: [1000, 1500] };
-const state = {
-  lang: 'pt', source: 'upload', format: 'feed45', template: 'classico',
-  photo: null, img: null,
-  title: '', price: '', loc: '', badge: '', showSpecs: true, bg: 'dark',
-  photos: [], carPhotos: [], photoFiles: [],
-  slides: [], slideIdx: 0,
-  // recorte inteligente + filtro de imagem (nome do preset em PHOTO_FILTERS)
-  smartCrop: true, filter: 'auto',
-  cropAdjust: {}, // { [urlDaFoto]: {panX, panY, zoom} } — ajuste manual de enquadramento, por foto
-  // categoria + ficha de produto — universal: imóveis, carros, viagens, cosmética,
-  // roupa, sapatos, ou qualquer outra coisa. Rótulos e valores totalmente editáveis.
-  category: 'generico',
-  _styleCustomized: false, // true assim que a pessoa escolhe cor/fundo à mão — a partir daí a categoria deixa de sugerir automaticamente
-  // campos extra específicos de certas categorias — só aparecem/contam quando
-  // a categoria ativa os usa (ver renderCategoryExtras)
-  energyRating: '', starRating: 0, allergens: [], sizes: [],
-  financeMonths: 60, financeDownPct: 20, financeAPR: 7.9,
-  spec: [ { label: '', value: '' }, { label: '', value: '' }, { label: '', value: '' }, { label: '', value: '' } ],
-  // marca — nome, cor, site, com ou sem marca de água
-  brand: { name: 'My Studio', site: '', sub: '', phone: '', accent: '#B8935A',
-           showWatermark: true, logoUrl: null, langs: new Set(['pt', 'en']) }
-};
-
-// ═══════════════════════════════════════════════════════════════
-//  RASCUNHO LOCAL (IndexedDB) — guarda automaticamente as fotos
-//  carregadas, textos e marca no browser, para não se perder nada
-//  se a página for fechada ou recarregada por acidente. Fica só
-//  neste dispositivo — nunca é enviado para lado nenhum.
-// ═══════════════════════════════════════════════════════════════
-const DRAFT_DB = 'zstudio-draft', DRAFT_STORE = 'kv';
-function idbOpen() {
-  return new Promise((resolve, reject) => {
-    if (!window.indexedDB) { reject(new Error('IndexedDB indisponível')); return; }
-    const req = indexedDB.open(DRAFT_DB, 1);
-    req.onupgradeneeded = () => req.result.createObjectStore(DRAFT_STORE);
-    req.onsuccess = () => resolve(req.result);
-    req.onerror = () => reject(req.error);
-  });
-}
-async function idbSet(key, value) {
-  const db = await idbOpen();
-  return new Promise((resolve, reject) => {
-    const tx = db.transaction(DRAFT_STORE, 'readwrite');
-    tx.objectStore(DRAFT_STORE).put(value, key);
-    tx.oncomplete = () => resolve();
-    tx.onerror = () => reject(tx.error);
-  });
-}
-async function idbGet(key) {
-  const db = await idbOpen();
-  return new Promise((resolve, reject) => {
-    const tx = db.transaction(DRAFT_STORE, 'readonly');
-    const req = tx.objectStore(DRAFT_STORE).get(key);
-    req.onsuccess = () => resolve(req.result);
-    req.onerror = () => reject(req.error);
-  });
-}
-async function idbDelete(key) {
-  const db = await idbOpen();
-  return new Promise((resolve, reject) => {
-    const tx = db.transaction(DRAFT_STORE, 'readwrite');
-    tx.objectStore(DRAFT_STORE).delete(key);
-    tx.oncomplete = () => resolve();
-    tx.onerror = () => reject(tx.error);
-  });
-}
-
+// [FORMATS + state extraídos para src/state/state.js — ver ficheiro]
+// [idbOpen/idbSet/idbGet/idbDelete extraídos para src/storage/indexeddb.js — ver ficheiro]
 let _saveDraftTimer = null;
 // Contador de geração: uma limpeza de rascunho incrementa isto, para que uma
 // gravação automática que já estava "em voo" (ex.: a meio da compressão de uma

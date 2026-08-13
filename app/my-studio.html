@@ -1345,11 +1345,9 @@ const CATEGORY_BADGES = {
   }
 };
 
-// src/main.js — estado, rendering (canvas), UI, exportações, IndexedDB.
-// Depende de src/data/i18n.js e src/data/categories.js (concatenados antes
-// deste ficheiro pelo scripts/build.js — precisam de estar definidos
-// primeiro, já que main.js lê I18N/UI_STRINGS/CATEGORY_* diretamente).
-// Extraído de app/my-studio.html — Phase 2 da auditoria de estabilização.
+// src/state/state.js — o estado global da aplicação (single source of truth
+// em memória). Um único objeto simples, sem lógica — quem lê/escreve são as
+// funções em src/main.js. Extraído na Phase 2 (continuação) da auditoria.
 
 // ═══ ESTADO ═══
 const FORMATS = { feed45: [1080, 1350], square: [1080, 1080], story: [1080, 1920], wide: [1920, 1080], pin: [1000, 1500] };
@@ -1375,6 +1373,12 @@ const state = {
   brand: { name: 'My Studio', site: '', sub: '', phone: '', accent: '#B8935A',
            showWatermark: true, logoUrl: null, langs: new Set(['pt', 'en']) }
 };
+
+
+
+// src/storage/indexeddb.js — persistência local do rascunho (fotos, textos,
+// marca). Fica só no dispositivo da pessoa, nunca é enviado para lado
+// nenhum. Extraído na Phase 2 (continuação) da auditoria de estabilização.
 
 // ═══════════════════════════════════════════════════════════════
 //  RASCUNHO LOCAL (IndexedDB) — guarda automaticamente as fotos
@@ -1420,6 +1424,16 @@ async function idbDelete(key) {
   });
 }
 
+
+
+// src/main.js — estado, rendering (canvas), UI, exportações, IndexedDB.
+// Depende de src/data/i18n.js e src/data/categories.js (concatenados antes
+// deste ficheiro pelo scripts/build.js — precisam de estar definidos
+// primeiro, já que main.js lê I18N/UI_STRINGS/CATEGORY_* diretamente).
+// Extraído de app/my-studio.html — Phase 2 da auditoria de estabilização.
+
+// [FORMATS + state extraídos para src/state/state.js — ver ficheiro]
+// [idbOpen/idbSet/idbGet/idbDelete extraídos para src/storage/indexeddb.js — ver ficheiro]
 let _saveDraftTimer = null;
 // Contador de geração: uma limpeza de rascunho incrementa isto, para que uma
 // gravação automática que já estava "em voo" (ex.: a meio da compressão de uma
