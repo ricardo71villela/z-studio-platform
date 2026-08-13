@@ -26,6 +26,7 @@ function assemble() {
   const categories = fs.readFileSync(path.join(SRC, 'data', 'categories.js'), 'utf-8');
   const stateModule = fs.readFileSync(path.join(SRC, 'state', 'state.js'), 'utf-8');
   const storage = fs.readFileSync(path.join(SRC, 'storage', 'indexeddb.js'), 'utf-8');
+  const platformStorage = fs.readFileSync(path.join(SRC, 'platform', 'storage.js'), 'utf-8');
   const main = fs.readFileSync(path.join(SRC, 'main.js'), 'utf-8');
 
   if (!template.includes(PLACEHOLDER)) {
@@ -34,8 +35,10 @@ function assemble() {
 
   // ordem importa: dados primeiro (main.js lê I18N/CATEGORY_* como já definidos),
   // depois state (main.js lê/escreve em state diretamente), depois storage
-  // (main.js chama idbGet/idbSet/idbDelete), só depois o resto da lógica
-  const script = [i18n, categories, stateModule, storage, main].join('\n\n');
+  // (main.js chama idbGet/idbSet/idbDelete), depois platform/storage (usa
+  // IS_NATIVE_PLATFORM e toast(), definidos em main.js — seguro por hoisting/
+  // ordem de execução, ver comentário no próprio ficheiro), só depois o resto
+  const script = [i18n, categories, stateModule, storage, platformStorage, main].join('\n\n');
   const html = template.replace(PLACEHOLDER, script);
 
   fs.mkdirSync(path.dirname(OUTPUT), { recursive: true });
