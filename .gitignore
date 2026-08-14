@@ -9,3 +9,4 @@ native/android/app/build/
 native/android/build/
 native/android/local.properties
 .vercel
+.env*
