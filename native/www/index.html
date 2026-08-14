@@ -2929,7 +2929,7 @@ function buildCaption() {
 // quando publicado no mesmo domínio). Em contexto Capacitor NÃO existe essa
 // garantia — a app nativa corre de uma origem própria (ex.: capacitor://
 // localhost), por isso precisa de um URL absoluto explícito.
-const AI_API_BASE_URL_NATIVE = ''; // <-- PREENCHER antes de publicar iOS/Android, ex.: 'https://api.oteudominio.com/ai'
+const AI_API_BASE_URL_NATIVE = 'https://z-studio-platform-seven.vercel.app/api/ai'; // <-- PREENCHER antes de publicar iOS/Android, ex.: 'https://api.oteudominio.com/ai'
 const IS_NATIVE_PLATFORM = !!(window.Capacitor && window.Capacitor.isNativePlatform && window.Capacitor.isNativePlatform());
 const AI_ENDPOINT = IS_NATIVE_PLATFORM ? (AI_API_BASE_URL_NATIVE || '/api/ai') : '/api/ai';
 if (IS_NATIVE_PLATFORM && !AI_API_BASE_URL_NATIVE) {

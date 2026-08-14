@@ -145,7 +145,7 @@ module.exports = async function handler(req, res) {
       const errText = await upstream.text().catch(() => '');
       console.error('[api/ai] Erro do fornecedor de IA:', upstream.status, errText.slice(0, 500));
       res.writeHead(502, { 'Content-Type': 'application/json', ...corsHeaders(origin) });
-      res.end(JSON.stringify({ error: 'O serviço de IA não respondeu corretamente. Tenta outra vez.', debug_status: upstream.status, debug_detail: errText.slice(0, 300) }));
+      res.end(JSON.stringify({ error: 'O serviço de IA não respondeu corretamente. Tenta outra vez.' }));
       return;
     }
 
