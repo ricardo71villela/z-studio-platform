@@ -17,9 +17,9 @@
 // noutro sítio (Netlify Functions, Cloudflare Workers, etc.), a lógica abaixo
 // mantém-se — só a assinatura da função de entrada/saída muda.
 
-const ANTHROPIC_API_URL = 'https://api.anthropic.com/v1/messages';
+const ANTHROPIC_API_URL = 'https://ai-gateway.vercel.sh/v1/messages';
 const ANTHROPIC_VERSION = '2023-06-01';
-const MODEL = 'claude-sonnet-4-6'; // ajustar conforme o modelo pretendido/disponível
+const MODEL = 'anthropic/claude-3-haiku'; // formato do AI Gateway: fornecedor/modelo
 const MAX_ALLOWED_TOKENS = 2000;   // teto duro — o frontend pode pedir menos, nunca mais
 const REQUEST_TIMEOUT_MS = 20000;
 
@@ -145,7 +145,7 @@ module.exports = async function handler(req, res) {
       const errText = await upstream.text().catch(() => '');
       console.error('[api/ai] Erro do fornecedor de IA:', upstream.status, errText.slice(0, 500));
       res.writeHead(502, { 'Content-Type': 'application/json', ...corsHeaders(origin) });
-      res.end(JSON.stringify({ error: 'O serviço de IA não respondeu corretamente. Tenta outra vez.' }));
+      res.end(JSON.stringify({ error: 'O serviço de IA não respondeu corretamente. Tenta outra vez.', debug_status: upstream.status, debug_detail: errText.slice(0, 300) }));
       return;
     }
 
