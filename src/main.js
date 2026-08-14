@@ -400,6 +400,30 @@ function renderPhotoGrid() {
       <button class="ph-remove" onclick="event.stopPropagation(); removePhoto('${encodeURI(u)}')" aria-label="Eliminar esta foto" title="Eliminar esta foto">✕</button>
     </div>`).join('');
   updateProgressiveDisclosure();
+  }
+  async function removePhoto(url) {
+  const u = decodeURI(url);
+  const idx = state.photos.indexOf(u);
+  if (idx === -1) return;
+  state.photos = state.photos.filter(x => x !== u);
+  state.carPhotos = state.carPhotos.filter(x => x !== u);
+  delete state.cropAdjust[u];
+  try { URL.revokeObjectURL(u); } catch (e) {}
+  if (state.photo === u) {
+    const next = state.photos[0] || null;
+    state.photo = next;
+    if (next) {
+      state.img = await loadImg(next);
+      if (!state.carPhotos.includes(next)) state.carPhotos.unshift(next);
+    } else {
+      state.img = null;
+    }
+    syncCropAdjustUI();
+  }
+  renderPhotoGrid();
+  buildSlides(0);
+  await draw();
+  scheduleSaveDraft();
 }
 async function removePhoto(url) {
   const u = decodeURI(url);
