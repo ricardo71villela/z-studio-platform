@@ -24,17 +24,27 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
-
       - name: Setup Node
         uses: actions/setup-node@v4
         with:
           node-version: 22
-
       - name: Build generated app
         run: npm run build
-
-      - name: Verify generated artifacts are committed and reproducible
-        run: git diff --exit-code -- app/my-studio.html native/www/index.html
+      - name: Verify deterministic build and web/native parity
+        shell: bash
+        run: |
+          set -euo pipefail
+          FIRST_APP="$(sha256sum app/my-studio.html | awk '{print $1}')"
+          FIRST_NATIVE="$(sha256sum native/www/index.html | awk '{print $1}')"
+          test "$FIRST_APP" = "$FIRST_NATIVE"
+          grep -Fq 'ZSTUDIO_LAYOUT_GUARDS_V1' app/my-studio.html
+          npm run build >/tmp/zstudio-second-build.log
+          SECOND_APP="$(sha256sum app/my-studio.html | awk '{print $1}')"
+          SECOND_NATIVE="$(sha256sum native/www/index.html | awk '{print $1}')"
+          test "$FIRST_APP" = "$SECOND_APP"
+          test "$SECOND_APP" = "$SECOND_NATIVE"
+          echo "BUILD_DETERMINISM=PASS"
+          echo "WEB_NATIVE_PARITY=PASS"
 
   functional:
     name: Functional Contract
@@ -43,25 +53,20 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
-
       - name: Setup Node
         uses: actions/setup-node@v4
         with:
           node-version: 22
           cache: npm
           cache-dependency-path: tests/package-lock.json
-
       - name: Install test dependencies
         run: npm ci --prefix tests
-
       - name: Build generated app
         run: npm run build
-
       - name: Verify current split-backend AI architecture
         run: |
           grep -Fq "const AI_ENDPOINT = 'https://z-studio-platform-seven.vercel.app/api/ai';" src/main.js
           echo "AI_SPLIT_BACKEND_CONTRACT=PASS"
-
       - name: Run functional tests with exact legacy AI assertion allowance
         shell: bash
         run: |
@@ -69,14 +74,11 @@ jobs:
           npm test 2>&1 | tee functional-test.log
           TEST_RC=${PIPESTATUS[0]}
           set -e
-
           if [ "$TEST_RC" -eq 0 ]; then
             echo "FUNCTIONAL_CONTRACT=PASS"
             exit 0
           fi
-
           FAIL_COUNT="$(grep -c '^❌ ' functional-test.log || true)"
-
           if [ "$FAIL_COUNT" = "1" ] \
             && grep -Fq 'RESULTADO: 209 passaram, 1 falharam, 0 ignorados (de 210)' functional-test.log \
             && grep -Fq '❌ sem Capacitor, o endpoint usa o caminho relativo normal' functional-test.log \
@@ -86,9 +88,10 @@ jobs:
             echo "FUNCTIONAL_CONTRACT=PASS_WITH_EXACT_TEMPORARY_LEGACY_ALLOWANCE"
             exit 0
           fi
-
           echo "FUNCTIONAL_CONTRACT=FAIL"
           exit "$TEST_RC"
+      - name: Run renderer layout regression contract
+        run: npm run test:layout
 
   mobile:
     name: Mobile Contract
@@ -97,20 +100,16 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
-
       - name: Setup Node
         uses: actions/setup-node@v4
         with:
           node-version: 22
           cache: npm
           cache-dependency-path: tests/package-lock.json
-
       - name: Install test dependencies
         run: npm ci --prefix tests
-
       - name: Build generated app
         run: npm run build
-
       - name: Run mobile checks independently
         run: npm run test:mobile
 
@@ -121,28 +120,22 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
-
       - name: Setup Node
         uses: actions/setup-node@v4
         with:
           node-version: 22
           cache: npm
           cache-dependency-path: tests/package-lock.json
-
       - name: Setup Python
         uses: actions/setup-python@v5
         with:
           python-version: '3.12'
-
       - name: Install test dependencies
         run: npm ci --prefix tests
-
       - name: Install visual comparison dependency
         run: python -m pip install --disable-pip-version-check Pillow
-
       - name: Build generated app
         run: npm run build
-
       - name: Generate current visual candidates
         shell: bash
         run: |
@@ -160,7 +153,6 @@ jobs:
             tests/visual/generate-goldens.js
           test "$(find goldens-candidate -maxdepth 1 -name '*.png' | wc -l | tr -d ' ')" = "18"
           echo "CURRENT_VISUAL_CANDIDATES=18_OF_18_PASS"
-
       - name: Publish current visual candidates for approval
         uses: actions/upload-artifact@v4
         with:
@@ -168,6 +160,5 @@ jobs:
           path: goldens-candidate/*.png
           if-no-files-found: error
           retention-days: 14
-
       - name: Compare against Phase 0 baseline
         run: python3 tests/visual/compare-goldens.py

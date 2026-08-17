@@ -4,10 +4,11 @@
 //
 // A partir da Phase 2 da auditoria, app/my-studio.html PASSA A SER UM
 // FICHEIRO GERADO — não editar diretamente. A fonte real vive em:
-//   src/template.html        — a estrutura HTML/CSS, com um placeholder
-//   src/data/i18n.js         — traduções (conteúdo dos posts + interface)
-//   src/data/categories.js   — categorias, paletas, selos, campos extra
-//   src/main.js              — estado, rendering, UI, exportações
+//   src/template.html              — a estrutura HTML/CSS, com um placeholder
+//   src/data/i18n.js               — traduções (conteúdo dos posts + interface)
+//   src/data/categories.js         — categorias, paletas, selos, campos extra
+//   src/main.js                    — estado, rendering, UI, exportações
+//   src/render/layout-guards.js    — guards de layout carregados após o renderer legado
 //
 // Ordem de concatenação importa: main.js lê I18N/UI_STRINGS/CATEGORY_* como
 // variáveis já definidas, por isso os dados têm de vir primeiro.
@@ -28,17 +29,17 @@ function assemble() {
   const storage = fs.readFileSync(path.join(SRC, 'storage', 'indexeddb.js'), 'utf-8');
   const platformStorage = fs.readFileSync(path.join(SRC, 'platform', 'storage.js'), 'utf-8');
   const main = fs.readFileSync(path.join(SRC, 'main.js'), 'utf-8');
+  const layoutGuards = fs.readFileSync(path.join(SRC, 'render', 'layout-guards.js'), 'utf-8');
 
   if (!template.includes(PLACEHOLDER)) {
     throw new Error('src/template.html não tem o placeholder ' + PLACEHOLDER + ' — a montagem não sabe onde inserir o script.');
   }
 
   // ordem importa: dados primeiro (main.js lê I18N/CATEGORY_* como já definidos),
-  // depois state (main.js lê/escreve em state diretamente), depois storage
-  // (main.js chama idbGet/idbSet/idbDelete), depois platform/storage (usa
-  // IS_NATIVE_PLATFORM e toast(), definidos em main.js — seguro por hoisting/
-  // ordem de execução, ver comentário no próprio ficheiro), só depois o resto
-  const script = [i18n, categories, stateModule, storage, platformStorage, main].join('\n\n');
+  // depois state (main.js lê/escreve em state diretamente), depois storage,
+  // platform/storage e renderer legado. Os guards vêm no fim para substituir
+  // apenas as primitivas de layout estabilizadas nesta fase.
+  const script = [i18n, categories, stateModule, storage, platformStorage, main, layoutGuards].join('\n\n');
   const html = template.replace(PLACEHOLDER, script);
 
   fs.mkdirSync(path.dirname(OUTPUT), { recursive: true });

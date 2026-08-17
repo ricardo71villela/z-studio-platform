@@ -11,6 +11,7 @@
     "build:android": "npm run sync && cd native/android && ./gradlew assembleDebug",
     "test": "npm test --prefix tests -- ../app/my-studio.html",
     "test:mobile": "npm run test:mobile --prefix tests -- ../app/my-studio.html",
+    "test:layout": "npm run test:layout --prefix tests -- ../app/my-studio.html",
     "test:visual": "node scripts/test-visual.js"
   }
 }
