@@ -1,9 +1,10 @@
 #!/usr/bin/env node
-// Monta app/my-studio.html a partir dos módulos em src/, aplica a identidade
-// comercial visível e propaga o resultado aos destinos web/nativos.
+// Monta os artefactos web do Z Studio a partir dos módulos em src/, aplica a
+// identidade comercial visível e propaga o mesmo HTML aos destinos web/nativos.
 //
-// A partir da Phase 2 da auditoria, app/my-studio.html PASSA A SER UM
-// FICHEIRO GERADO — não editar diretamente. A fonte real vive em:
+// app/index.html é a entrada web canónica. app/my-studio.html mantém-se apenas
+// como rota de compatibilidade. Ambos são FICHEIROS GERADOS — não editar
+// diretamente. A fonte real vive em:
 //   src/template.html              — a estrutura HTML/CSS, com um placeholder
 //   src/data/i18n.js               — traduções (conteúdo dos posts + interface)
 //   src/data/categories.js         — categorias, paletas, selos, campos extra
@@ -18,7 +19,8 @@ const path = require('path');
 
 const ROOT = path.join(__dirname, '..');
 const SRC = path.join(ROOT, 'src');
-const OUTPUT = path.join(ROOT, 'app', 'my-studio.html');
+const WEB_INDEX_OUTPUT = path.join(ROOT, 'app', 'index.html');
+const WEB_LEGACY_OUTPUT = path.join(ROOT, 'app', 'my-studio.html');
 
 const PLACEHOLDER = '__MYSTUDIO_SCRIPT_PLACEHOLDER__';
 const LEGACY_BRAND = 'My Studio';
@@ -57,11 +59,12 @@ function assemble() {
   // fim para substituir apenas as primitivas de layout estabilizadas.
   const script = [i18n, categories, stateModule, storage, platformStorage, main, layoutGuards].join('\n\n');
   const html = applyCommercialIdentity(template.replace(PLACEHOLDER, script));
-  assertCommercialIdentity(html, 'app/my-studio.html');
+  assertCommercialIdentity(html, 'artefacto web Z Studio');
 
-  fs.mkdirSync(path.dirname(OUTPUT), { recursive: true });
-  fs.writeFileSync(OUTPUT, html, 'utf-8');
-  console.log('✅ Montado app/my-studio.html com identidade Z Studio (' + html.length + ' caracteres)');
+  fs.mkdirSync(path.dirname(WEB_INDEX_OUTPUT), { recursive: true });
+  fs.writeFileSync(WEB_INDEX_OUTPUT, html, 'utf-8');
+  fs.writeFileSync(WEB_LEGACY_OUTPUT, html, 'utf-8');
+  console.log('✅ Montados app/index.html e app/my-studio.html com identidade Z Studio (' + html.length + ' caracteres)');
   return html;
 }
 
@@ -73,16 +76,21 @@ function copyTextWithIdentity(source, target) {
 }
 
 function propagate() {
-  const html = fs.readFileSync(OUTPUT, 'utf-8');
-  assertCommercialIdentity(html, 'app/my-studio.html');
+  const html = fs.readFileSync(WEB_INDEX_OUTPUT, 'utf-8');
+  assertCommercialIdentity(html, 'app/index.html');
+
+  const legacyHtml = fs.readFileSync(WEB_LEGACY_OUTPUT, 'utf-8');
+  if (legacyHtml !== html) {
+    throw new Error('app/index.html e app/my-studio.html divergiram durante o build.');
+  }
 
   const nativeWww = path.join(ROOT, 'native', 'www');
   fs.mkdirSync(nativeWww, { recursive: true });
   fs.writeFileSync(path.join(nativeWww, 'index.html'), html, 'utf-8');
   console.log('✅ Copiado para native/www/index.html');
 
-  // PWA: a mesma fonte serve o web build e o wrapper nativo. O nome de ficheiro
-  // my-studio.html mantém-se nesta fase por compatibilidade de rota; não é marca visível.
+  // PWA: a mesma fonte serve o web build e o wrapper nativo. A raiz web é agora
+  // a entrada canónica; my-studio.html permanece apenas para links legados.
   const pwaDir = path.join(ROOT, 'pwa');
   const appDir = path.join(ROOT, 'app');
   const pwaTextFiles = ['manifest.webmanifest', 'sw.js'];
