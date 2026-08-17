@@ -162,7 +162,7 @@ async function handler(req, res) {
 
   const ip = getClientIp(req);
   if (!checkRateLimit(ip)) {
-    logEvent('warn', 'local_rate_limit', { requestId, ip });
+    logEvent('warn', 'local_rate_limit', { requestId });
     writeJson(
       res,
       429,
