@@ -5,6 +5,7 @@ on:
     branches:
       - master
       - feature/zstudio-store-readiness-v1
+      - feature/zstudio-web-production-v1
   pull_request:
     branches:
       - master
@@ -30,35 +31,60 @@ jobs:
           node-version: 22
       - name: Build generated app
         run: npm run build
-      - name: Verify deterministic build and web/native parity
+      - name: Verify deterministic build, committed web authority and web/native parity
         shell: bash
         run: |
           set -euo pipefail
-          FIRST_APP="$(sha256sum app/my-studio.html | awk '{print $1}')"
+          test -f app/index.html
+          FIRST_INDEX="$(sha256sum app/index.html | awk '{print $1}')"
+          FIRST_LEGACY="$(sha256sum app/my-studio.html | awk '{print $1}')"
           FIRST_NATIVE="$(sha256sum native/www/index.html | awk '{print $1}')"
-          test "$FIRST_APP" = "$FIRST_NATIVE"
-          grep -Fq 'ZSTUDIO_LAYOUT_GUARDS_V1' app/my-studio.html
+          test "$FIRST_INDEX" = "$FIRST_LEGACY"
+          test "$FIRST_INDEX" = "$FIRST_NATIVE"
+          grep -Fq 'ZSTUDIO_LAYOUT_GUARDS_V1' app/index.html
+
+          git diff --exit-code -- \
+            app/index.html \
+            app/my-studio.html \
+            app/manifest.webmanifest \
+            app/sw.js \
+            app/politica-privacidade.html \
+            app/termos-de-servico.html \
+            native/www/index.html \
+            native/www/manifest.webmanifest \
+            native/www/sw.js \
+            native/www/politica-privacidade.html \
+            native/www/termos-de-servico.html
+          echo "COMMITTED_WEB_AUTHORITY=PASS"
+
           npm run build >/tmp/zstudio-second-build.log
-          SECOND_APP="$(sha256sum app/my-studio.html | awk '{print $1}')"
+          SECOND_INDEX="$(sha256sum app/index.html | awk '{print $1}')"
+          SECOND_LEGACY="$(sha256sum app/my-studio.html | awk '{print $1}')"
           SECOND_NATIVE="$(sha256sum native/www/index.html | awk '{print $1}')"
-          test "$FIRST_APP" = "$SECOND_APP"
-          test "$SECOND_APP" = "$SECOND_NATIVE"
+          test "$FIRST_INDEX" = "$SECOND_INDEX"
+          test "$SECOND_INDEX" = "$SECOND_LEGACY"
+          test "$SECOND_INDEX" = "$SECOND_NATIVE"
           echo "BUILD_DETERMINISM=PASS"
+          echo "WEB_ROOT_AUTHORITY=PASS"
           echo "WEB_NATIVE_PARITY=PASS"
       - name: Verify Z Studio brand and store identity contract
         shell: bash
         run: |
           set -euo pipefail
-          grep -Fq '<title>Z Studio — Conteúdo para Redes Sociais</title>' app/my-studio.html
-          grep -Fq 'Z Studio ·' app/my-studio.html
-          grep -Fq 'Z STUDIO' app/my-studio.html
-          ! grep -Fq 'My Studio' app/my-studio.html
-          ! grep -Fq 'MY STUDIO' app/my-studio.html
-          cmp -s app/my-studio.html native/www/index.html
+          grep -Fq '<title>Z Studio — Conteúdo para Redes Sociais</title>' app/index.html
+          grep -Fq 'Z Studio ·' app/index.html
+          grep -Fq 'Z STUDIO' app/index.html
+          ! grep -Fq 'My Studio' app/index.html
+          ! grep -Fq 'MY STUDIO' app/index.html
+          cmp -s app/index.html app/my-studio.html
+          cmp -s app/index.html native/www/index.html
 
           grep -Fq '"short_name": "Z Studio"' pwa/manifest.webmanifest
+          grep -Fq '"start_url": "./"' pwa/manifest.webmanifest
           grep -Fq '"short_name": "Z Studio"' app/manifest.webmanifest
+          grep -Fq '"start_url": "./"' app/manifest.webmanifest
           grep -Fq '"short_name": "Z Studio"' native/www/manifest.webmanifest
+          grep -Fq "const CACHE_NAME = 'z-studio-shell-v2';" app/sw.js
 
           grep -Fq '"appName": "Z Studio"' native/capacitor.config.json
           grep -Fq '"appId": "com.zoperatingsystem.zstudio"' native/capacitor.config.json
@@ -189,7 +215,7 @@ jobs:
         run: python -m pip install --disable-pip-version-check Pillow
       - name: Build generated app
         run: npm run build
-      - name: Generate current visual candidates
+      - name: Generate current visual candidates from canonical web root
         shell: bash
         run: |
           set -euo pipefail
@@ -198,7 +224,7 @@ jobs:
           trap 'kill "$SERVER_PID" 2>/dev/null || true' EXIT
           sleep 1
           MYSTUDIO_GOLDENS_OUT="$GITHUB_WORKSPACE/goldens-candidate" \
-          MYSTUDIO_URL="http://localhost:8793/my-studio.html" \
+          MYSTUDIO_URL="http://localhost:8793/" \
           tests/node_modules/.bin/electron \
             --no-sandbox \
             --disable-gpu \
