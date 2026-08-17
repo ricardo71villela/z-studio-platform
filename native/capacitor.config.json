@@ -1,6 +1,6 @@
 {
-  "appId": "com.mystudio.app",
-  "appName": "My Studio",
+  "appId": "com.zoperatingsystem.zstudio",
+  "appName": "Z Studio",
   "webDir": "www",
   "backgroundColor": "#0A0A0A",
   "ios": {

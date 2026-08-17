@@ -1,4 +1,4 @@
-package com.mystudio.app;
+package com.zoperatingsystem.zstudio;
 
 import com.getcapacitor.BridgeActivity;
 
