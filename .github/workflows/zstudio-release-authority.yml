@@ -45,7 +45,7 @@ jobs:
           test "$SECOND_APP" = "$SECOND_NATIVE"
           echo "BUILD_DETERMINISM=PASS"
           echo "WEB_NATIVE_PARITY=PASS"
-      - name: Verify Z Studio visible brand contract
+      - name: Verify Z Studio brand and store identity contract
         shell: bash
         run: |
           set -euo pipefail
@@ -61,11 +61,28 @@ jobs:
           grep -Fq '"short_name": "Z Studio"' native/www/manifest.webmanifest
 
           grep -Fq '"appName": "Z Studio"' native/capacitor.config.json
-          grep -Fq '"appId": "com.mystudio.app"' native/capacitor.config.json
+          grep -Fq '"appId": "com.zoperatingsystem.zstudio"' native/capacitor.config.json
+          grep -Fq 'namespace = "com.zoperatingsystem.zstudio"' native/android/app/build.gradle
+          grep -Fq 'applicationId "com.zoperatingsystem.zstudio"' native/android/app/build.gradle
           grep -Fq '<string name="app_name">Z Studio</string>' native/android/app/src/main/res/values/strings.xml
           grep -Fq '<string name="title_activity_main">Z Studio</string>' native/android/app/src/main/res/values/strings.xml
-          grep -Fq '<string name="package_name">com.mystudio.app</string>' native/android/app/src/main/res/values/strings.xml
+          grep -Fq '<string name="package_name">com.zoperatingsystem.zstudio</string>' native/android/app/src/main/res/values/strings.xml
+          grep -Fq '<string name="custom_url_scheme">com.zoperatingsystem.zstudio</string>' native/android/app/src/main/res/values/strings.xml
+          test -f native/android/app/src/main/java/com/zoperatingsystem/zstudio/MainActivity.java
+          grep -Fq 'package com.zoperatingsystem.zstudio;' native/android/app/src/main/java/com/zoperatingsystem/zstudio/MainActivity.java
+          test ! -e native/android/app/src/main/java/com/mystudio/app/MainActivity.java
+          test "$(grep -Fc 'PRODUCT_BUNDLE_IDENTIFIER = com.zoperatingsystem.zstudio;' native/ios/App/App.xcodeproj/project.pbxproj)" = "2"
           grep -Fq '<string>Z Studio</string>' native/ios/App/App/Info.plist
+
+          ! grep -Fq 'com.mystudio.app' native/capacitor.config.json
+          ! grep -Fq 'com.mystudio.app' native/android/app/build.gradle
+          ! grep -Fq 'com.mystudio.app' native/android/app/src/main/res/values/strings.xml
+          ! grep -R -Fq 'com.mystudio.app' native/android/app/src/main/java
+          ! grep -Fq 'com.mystudio.app' native/ios/App/App.xcodeproj/project.pbxproj
+          grep -Fxq '*.jks' .gitignore
+          grep -Fxq '*.keystore' .gitignore
+          grep -Fxq '*.jks' native/android/.gitignore
+          grep -Fxq '*.keystore' native/android/.gitignore
 
           ! grep -Fq 'My Studio' legal/politica-privacidade.html
           ! grep -Fq 'My Studio' legal/termos-de-servico.html
@@ -75,7 +92,8 @@ jobs:
           grep -Fq 'Z Studio' native/www/termos-de-servico.html
 
           echo "Z_STUDIO_VISIBLE_BRAND_CONTRACT=PASS"
-          echo "LEGACY_STORE_ID_PRESERVED_FOR_A1_2B=PASS"
+          echo "Z_STUDIO_STORE_IDENTITY_CONTRACT=PASS"
+          echo "LEGACY_STORE_ID_REMOVED=PASS"
 
   functional:
     name: Functional Contract
@@ -195,5 +213,5 @@ jobs:
           path: goldens-candidate/*.png
           if-no-files-found: error
           retention-days: 14
-      - name: Compare against Phase 0 baseline
+      - name: Compare against approved Z Studio baseline
         run: python3 tests/visual/compare-goldens.py

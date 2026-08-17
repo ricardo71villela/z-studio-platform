@@ -10,3 +10,5 @@ native/android/build/
 native/android/local.properties
 .vercel
 .env*
+*.jks
+*.keystore
