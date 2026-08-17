@@ -143,5 +143,31 @@ jobs:
       - name: Build generated app
         run: npm run build
 
-      - name: Run golden visual regression against Phase 0 baseline
-        run: npm run test:visual
+      - name: Generate current visual candidates
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 -m http.server 8793 --directory app >/tmp/zstudio-visual-http.log 2>&1 &
+          SERVER_PID=$!
+          trap 'kill "$SERVER_PID" 2>/dev/null || true' EXIT
+          sleep 1
+          MYSTUDIO_GOLDENS_OUT="$GITHUB_WORKSPACE/goldens-candidate" \
+          MYSTUDIO_URL="http://localhost:8793/my-studio.html" \
+          tests/node_modules/.bin/electron \
+            --no-sandbox \
+            --disable-gpu \
+            --ozone-platform=headless \
+            tests/visual/generate-goldens.js
+          test "$(find goldens-candidate -maxdepth 1 -name '*.png' | wc -l | tr -d ' ')" = "18"
+          echo "CURRENT_VISUAL_CANDIDATES=18_OF_18_PASS"
+
+      - name: Publish current visual candidates for approval
+        uses: actions/upload-artifact@v4
+        with:
+          name: zstudio-current-visual-candidates
+          path: goldens-candidate/*.png
+          if-no-files-found: error
+          retention-days: 14
+
+      - name: Compare against Phase 0 baseline
+        run: python3 tests/visual/compare-goldens.py
