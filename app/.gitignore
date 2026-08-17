@@ -1,2 +1,3 @@
+# Vercel project root: app/. Keep local Vercel metadata and environment files out of Git.
 .vercel
 .env*
