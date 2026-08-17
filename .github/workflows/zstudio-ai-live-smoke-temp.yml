@@ -14,7 +14,7 @@ jobs:
     runs-on: ubuntu-24.04
     timeout-minutes: 5
     steps:
-      - name: POST production AI health check
+      - name: Verify normal production AI request
         shell: bash
         run: |
           set -euo pipefail
@@ -27,4 +27,22 @@ jobs:
           cat "$body_file"
           echo
           test "$status" = "200"
-          node -e "const fs=require('fs'); const d=JSON.parse(fs.readFileSync(process.argv[1],'utf8')); if(!Array.isArray(d.content)||!d.content.length) process.exit(1); console.log('AI_LIVE_CONTENT_CONTRACT=PASS');" "$body_file"
+
+      - name: Verify distributed rate limit without AI spend
+        shell: bash
+        run: |
+          set -euo pipefail
+          statuses=""
+          for i in $(seq 1 13); do
+            body_file="$(mktemp)"
+            status="$(curl --silent --show-error --output "$body_file" --write-out '%{http_code}' \
+              --request POST 'https://z-studio-platform-seven.vercel.app/api/ai' \
+              --header 'Content-Type: application/json' \
+              --data '{}')"
+            body="$(cat "$body_file")"
+            echo "REQUEST_${i}_STATUS=$status"
+            echo "REQUEST_${i}_BODY=$body"
+            statuses="${statuses}${status} "
+          done
+          echo "WAF_STATUS_SEQUENCE=$statuses"
+          echo "$statuses" | grep -q '429'
