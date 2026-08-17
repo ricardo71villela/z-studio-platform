@@ -1,6 +1,6 @@
 #!/usr/bin/env node
-// Monta app/my-studio.html a partir dos módulos em src/, depois propaga esse
-// resultado a todos os destinos que dele dependem (wrapper nativo, PWA).
+// Monta app/my-studio.html a partir dos módulos em src/, aplica a identidade
+// comercial visível e propaga o resultado aos destinos web/nativos.
 //
 // A partir da Phase 2 da auditoria, app/my-studio.html PASSA A SER UM
 // FICHEIRO GERADO — não editar diretamente. A fonte real vive em:
@@ -10,8 +10,9 @@
 //   src/main.js                    — estado, rendering, UI, exportações
 //   src/render/layout-guards.js    — guards de layout carregados após o renderer legado
 //
-// Ordem de concatenação importa: main.js lê I18N/UI_STRINGS/CATEGORY_* como
-// variáveis já definidas, por isso os dados têm de vir primeiro.
+// Durante a convergência comercial A1.2A, os módulos históricos ainda podem
+// conter o nome legado "My Studio". A identidade emitida pelo build é sempre
+// "Z Studio"; um contrato explícito impede que o nome antigo volte ao artefacto.
 const fs = require('fs');
 const path = require('path');
 
@@ -20,6 +21,22 @@ const SRC = path.join(ROOT, 'src');
 const OUTPUT = path.join(ROOT, 'app', 'my-studio.html');
 
 const PLACEHOLDER = '__MYSTUDIO_SCRIPT_PLACEHOLDER__';
+const LEGACY_BRAND = 'My Studio';
+const LEGACY_BRAND_UPPER = 'MY STUDIO';
+const COMMERCIAL_BRAND = 'Z Studio';
+const COMMERCIAL_BRAND_UPPER = 'Z STUDIO';
+
+function applyCommercialIdentity(text) {
+  return String(text)
+    .replaceAll(LEGACY_BRAND_UPPER, COMMERCIAL_BRAND_UPPER)
+    .replaceAll(LEGACY_BRAND, COMMERCIAL_BRAND);
+}
+
+function assertCommercialIdentity(text, label) {
+  if (text.includes(LEGACY_BRAND) || text.includes(LEGACY_BRAND_UPPER)) {
+    throw new Error(label + ' ainda contém a identidade legada My Studio.');
+  }
+}
 
 function assemble() {
   const template = fs.readFileSync(path.join(SRC, 'template.html'), 'utf-8');
@@ -36,43 +53,64 @@ function assemble() {
   }
 
   // ordem importa: dados primeiro (main.js lê I18N/CATEGORY_* como já definidos),
-  // depois state (main.js lê/escreve em state diretamente), depois storage,
-  // platform/storage e renderer legado. Os guards vêm no fim para substituir
-  // apenas as primitivas de layout estabilizadas nesta fase.
+  // depois state, storage, platform/storage e renderer legado. Os guards vêm no
+  // fim para substituir apenas as primitivas de layout estabilizadas.
   const script = [i18n, categories, stateModule, storage, platformStorage, main, layoutGuards].join('\n\n');
-  const html = template.replace(PLACEHOLDER, script);
+  const html = applyCommercialIdentity(template.replace(PLACEHOLDER, script));
+  assertCommercialIdentity(html, 'app/my-studio.html');
 
   fs.mkdirSync(path.dirname(OUTPUT), { recursive: true });
   fs.writeFileSync(OUTPUT, html, 'utf-8');
-  console.log('✅ Montado app/my-studio.html a partir de src/ (' + html.length + ' caracteres)');
+  console.log('✅ Montado app/my-studio.html com identidade Z Studio (' + html.length + ' caracteres)');
   return html;
 }
 
+function copyTextWithIdentity(source, target) {
+  const text = applyCommercialIdentity(fs.readFileSync(source, 'utf-8'));
+  assertCommercialIdentity(text, path.relative(ROOT, target));
+  fs.mkdirSync(path.dirname(target), { recursive: true });
+  fs.writeFileSync(target, text, 'utf-8');
+}
+
 function propagate() {
-  const TARGETS = [path.join(ROOT, 'native', 'www', 'index.html')];
   const html = fs.readFileSync(OUTPUT, 'utf-8');
-  let count = 0;
-  for (const target of TARGETS) {
-    const dir = path.dirname(target);
-    if (!fs.existsSync(dir)) { console.warn('⚠️  Destino não existe, a saltar:', target); continue; }
-    fs.writeFileSync(target, html, 'utf-8');
-    console.log('✅ Copiado para', path.relative(ROOT, target));
-    count++;
+  assertCommercialIdentity(html, 'app/my-studio.html');
+
+  const nativeWww = path.join(ROOT, 'native', 'www');
+  fs.mkdirSync(nativeWww, { recursive: true });
+  fs.writeFileSync(path.join(nativeWww, 'index.html'), html, 'utf-8');
+  console.log('✅ Copiado para native/www/index.html');
+
+  // PWA: a mesma fonte serve o web build e o wrapper nativo. O nome de ficheiro
+  // my-studio.html mantém-se nesta fase por compatibilidade de rota; não é marca visível.
+  const pwaDir = path.join(ROOT, 'pwa');
+  const appDir = path.join(ROOT, 'app');
+  const pwaTextFiles = ['manifest.webmanifest', 'sw.js'];
+  for (const f of pwaTextFiles) {
+    const source = path.join(pwaDir, f);
+    if (!fs.existsSync(source)) continue;
+    copyTextWithIdentity(source, path.join(appDir, f));
+    copyTextWithIdentity(source, path.join(nativeWww, f));
   }
 
-  const pwaFiles = ['manifest.webmanifest', 'sw.js'];
-  const pwaDir = path.join(ROOT, 'pwa');
-  const nativeWww = path.join(ROOT, 'native', 'www');
-  if (fs.existsSync(nativeWww)) {
-    for (const f of pwaFiles) {
-      const src = path.join(pwaDir, f);
-      if (fs.existsSync(src)) { fs.copyFileSync(src, path.join(nativeWww, f)); console.log('✅ Copiado', f, 'para native/www/'); }
-    }
-    const iconFiles = fs.existsSync(pwaDir) ? fs.readdirSync(pwaDir).filter(f => f.endsWith('.png')) : [];
-    for (const f of iconFiles) fs.copyFileSync(path.join(pwaDir, f), path.join(nativeWww, f));
-    if (iconFiles.length) console.log('✅ Copiados', iconFiles.length, 'ícones para native/www/');
+  const iconFiles = fs.existsSync(pwaDir) ? fs.readdirSync(pwaDir).filter(f => f.endsWith('.png')) : [];
+  for (const f of iconFiles) {
+    fs.copyFileSync(path.join(pwaDir, f), path.join(appDir, f));
+    fs.copyFileSync(path.join(pwaDir, f), path.join(nativeWww, f));
   }
-  console.log(`\nBuild concluído — ${count} destino(s) atualizado(s) a partir de app/my-studio.html`);
+  if (iconFiles.length) console.log('✅ Copiados', iconFiles.length, 'ícones para app/ e native/www/');
+
+  // Legal: mantém uma única fonte em legal/ e publica cópias coerentes nos dois
+  // destinos. A1.2A altera apenas a marca; a revisão jurídica continua separada.
+  const legalDir = path.join(ROOT, 'legal');
+  for (const f of ['termos-de-servico.html', 'politica-privacidade.html']) {
+    const source = path.join(legalDir, f);
+    if (!fs.existsSync(source)) continue;
+    copyTextWithIdentity(source, path.join(appDir, f));
+    copyTextWithIdentity(source, path.join(nativeWww, f));
+  }
+
+  console.log('\nBuild concluído — artefactos web/native sincronizados com identidade Z Studio');
   console.log('Lembrete: corre "npm run sync" a seguir para propagar ao iOS/Android (npx cap sync).');
 }
 

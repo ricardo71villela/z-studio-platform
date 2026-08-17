@@ -45,6 +45,37 @@ jobs:
           test "$SECOND_APP" = "$SECOND_NATIVE"
           echo "BUILD_DETERMINISM=PASS"
           echo "WEB_NATIVE_PARITY=PASS"
+      - name: Verify Z Studio visible brand contract
+        shell: bash
+        run: |
+          set -euo pipefail
+          grep -Fq '<title>Z Studio — Conteúdo para Redes Sociais</title>' app/my-studio.html
+          grep -Fq 'Z Studio ·' app/my-studio.html
+          grep -Fq 'Z STUDIO' app/my-studio.html
+          ! grep -Fq 'My Studio' app/my-studio.html
+          ! grep -Fq 'MY STUDIO' app/my-studio.html
+          cmp -s app/my-studio.html native/www/index.html
+
+          grep -Fq '"short_name": "Z Studio"' pwa/manifest.webmanifest
+          grep -Fq '"short_name": "Z Studio"' app/manifest.webmanifest
+          grep -Fq '"short_name": "Z Studio"' native/www/manifest.webmanifest
+
+          grep -Fq '"appName": "Z Studio"' native/capacitor.config.json
+          grep -Fq '"appId": "com.mystudio.app"' native/capacitor.config.json
+          grep -Fq '<string name="app_name">Z Studio</string>' native/android/app/src/main/res/values/strings.xml
+          grep -Fq '<string name="title_activity_main">Z Studio</string>' native/android/app/src/main/res/values/strings.xml
+          grep -Fq '<string name="package_name">com.mystudio.app</string>' native/android/app/src/main/res/values/strings.xml
+          grep -Fq '<string>Z Studio</string>' native/ios/App/App/Info.plist
+
+          ! grep -Fq 'My Studio' legal/politica-privacidade.html
+          ! grep -Fq 'My Studio' legal/termos-de-servico.html
+          grep -Fq 'Z Studio' app/politica-privacidade.html
+          grep -Fq 'Z Studio' app/termos-de-servico.html
+          grep -Fq 'Z Studio' native/www/politica-privacidade.html
+          grep -Fq 'Z Studio' native/www/termos-de-servico.html
+
+          echo "Z_STUDIO_VISIBLE_BRAND_CONTRACT=PASS"
+          echo "LEGACY_STORE_ID_PRESERVED_FOR_A1_2B=PASS"
 
   functional:
     name: Functional Contract
@@ -67,7 +98,7 @@ jobs:
         run: |
           grep -Fq "const AI_ENDPOINT = 'https://z-studio-platform-seven.vercel.app/api/ai';" src/main.js
           echo "AI_SPLIT_BACKEND_CONTRACT=PASS"
-      - name: Run functional tests with exact legacy AI assertion allowance
+      - name: Run functional tests with exact transitional assertions allowance
         shell: bash
         run: |
           set +e
@@ -79,13 +110,17 @@ jobs:
             exit 0
           fi
           FAIL_COUNT="$(grep -c '^❌ ' functional-test.log || true)"
-          if [ "$FAIL_COUNT" = "1" ] \
-            && grep -Fq 'RESULTADO: 209 passaram, 1 falharam, 0 ignorados (de 210)' functional-test.log \
+          if [ "$FAIL_COUNT" = "3" ] \
+            && grep -Fq 'RESULTADO: 207 passaram, 3 falharam, 0 ignorados (de 210)' functional-test.log \
+            && grep -Fq '❌ marca por defeito é My Studio' functional-test.log \
+            && grep -Fq '❌ sem "Z Studio" residual (nome antigo do produto)' functional-test.log \
             && grep -Fq '❌ sem Capacitor, o endpoint usa o caminho relativo normal' functional-test.log \
             && grep -Fq 'https://z-studio-platform-seven.vercel.app/api/ai' functional-test.log; then
+            echo "KNOWN_LEGACY_BRAND_ASSERTIONS=ACKNOWLEDGED_FOR_A1_2A"
             echo "KNOWN_LEGACY_AI_ENDPOINT_ASSERTION=ACKNOWLEDGED"
+            echo "CURRENT_Z_STUDIO_IDENTITY_CONTRACT=PASS"
             echo "CURRENT_AI_ARCHITECTURE_CONTRACT=PASS"
-            echo "FUNCTIONAL_CONTRACT=PASS_WITH_EXACT_TEMPORARY_LEGACY_ALLOWANCE"
+            echo "FUNCTIONAL_CONTRACT=PASS_WITH_EXACT_TEMPORARY_TRANSITION_ALLOWANCE"
             exit 0
           fi
           echo "FUNCTIONAL_CONTRACT=FAIL"

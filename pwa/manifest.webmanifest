@@ -1,6 +1,6 @@
 {
-  "name": "My Studio — Conteúdo para Redes Sociais",
-  "short_name": "My Studio",
+  "name": "Z Studio — Conteúdo para Redes Sociais",
+  "short_name": "Z Studio",
   "description": "Cria posts, stories e carrosséis para redes sociais a partir das tuas fotos, com recorte inteligente, ficha de produto por categoria e legendas por IA em 6 idiomas.",
   "start_url": "./my-studio.html",
   "scope": "./",
