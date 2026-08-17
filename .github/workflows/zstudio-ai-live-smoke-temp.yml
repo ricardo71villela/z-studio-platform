@@ -1,0 +1,30 @@
+name: Z Studio AI Live Smoke Temp
+
+on:
+  push:
+    branches:
+      - chore/zstudio-ai-live-smoke-temp
+
+permissions:
+  contents: read
+
+jobs:
+  live-ai-smoke:
+    name: Live AI Smoke
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - name: POST production AI health check
+        shell: bash
+        run: |
+          set -euo pipefail
+          body_file="$(mktemp)"
+          status="$(curl --silent --show-error --output "$body_file" --write-out '%{http_code}' \
+            --request POST 'https://z-studio-platform-seven.vercel.app/api/ai' \
+            --header 'Content-Type: application/json' \
+            --data '{"system":"Reply with exactly OK.","user":"Health check.","max_tokens":32}')"
+          echo "AI_LIVE_HTTP_STATUS=$status"
+          cat "$body_file"
+          echo
+          test "$status" = "200"
+          node -e "const fs=require('fs'); const d=JSON.parse(fs.readFileSync(process.argv[1],'utf8')); if(!Array.isArray(d.content)||!d.content.length) process.exit(1); console.log('AI_LIVE_CONTENT_CONTRACT=PASS');" "$body_file"
